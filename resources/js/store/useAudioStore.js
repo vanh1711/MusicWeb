@@ -223,6 +223,7 @@ export const useAudioStore = create((set, get) => ({
           title: track.title,
           artist: track.artist?.name || '',
           track_id: track.id,
+          duration: track.duration || 240,
         },
       });
 

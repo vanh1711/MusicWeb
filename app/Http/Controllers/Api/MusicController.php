@@ -152,8 +152,9 @@ class MusicController extends Controller
         $title = $request->get('title', '');
         $artist = $request->get('artist', '');
         $trackId = $request->get('track_id', '');
+        $duration = (int)$request->get('duration', 240);
 
-        $tracks = $this->liveMusic->getRecommendations($title, $artist, $trackId);
+        $tracks = $this->liveMusic->getRecommendations($title, $artist, $trackId, $duration);
 
         return response()->json([
             'title' => $title,

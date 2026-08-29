@@ -24,7 +24,7 @@ class LiveMusicService
      */
     public function getAudiusTrending(int $limit = 12): array
     {
-        return Cache::remember('audius_trending_v5', 600, function () use ($limit) {
+        return Cache::remember('audius_trending_v6', 600, function () use ($limit) {
             $host = $this->getAudiusHost();
             $url = "{$host}/v1/tracks/trending?app_name={$this->appName}&limit={$limit}";
 
@@ -159,48 +159,147 @@ class LiveMusicService
     }
 
     /**
-     * Get Recommended Related Tracks (Autoplay Radio & Up-Next Station)
+     * Smart Genre-, Mood- and Duration-Aware Recommendations (Autoplay Radio)
+     * Recommends DIFFERENT random tracks of the same vibe and duration, filtering out same-song duplicates!
      */
-    public function getRecommendations(string $title, ?string $artistName = null, ?string $currentTrackId = null): array
+    public function getRecommendations(string $title, ?string $artistName = null, ?string $currentTrackId = null, int $currentDuration = 240): array
     {
-        $cleanArtist = trim($artistName ?: '');
         $cleanTitle = trim($title);
+        $cleanArtist = trim($artistName ?: '');
+        $lowerTitle = mb_strtolower($cleanTitle . ' ' . $cleanArtist);
 
-        // Remove extra clutter from title like "(Official MV)", "[Audio]", "(M/V)"
-        $cleanKeywords = preg_replace('/(\(.*?\)|\(.*|\[.*?\])/i', '', $cleanTitle);
-        $cleanKeywords = trim($cleanKeywords);
+        // 1. Detect Category / Vibe
+        $isRemix = str_contains($lowerTitle, 'remix') || str_contains($lowerTitle, 'vinahouse') || str_contains($lowerTitle, 'viet mix') || str_contains($lowerTitle, 'speed up') || str_contains($lowerTitle, 'nightcore');
+        $isChill = str_contains($lowerTitle, 'chill') || str_contains($lowerTitle, 'lofi') || str_contains($lowerTitle, 'acoustic') || str_contains($lowerTitle, 'indie') || str_contains($lowerTitle, 'đen') || str_contains($lowerTitle, 'vũ') || str_contains($lowerTitle, 'chillies') || str_contains($lowerTitle, 'hoàng dũng');
+        $isRap = str_contains($lowerTitle, 'rap') || str_contains($lowerTitle, 'hip hop') || str_contains($lowerTitle, 'hieuthuhai') || str_contains($lowerTitle, 'mck') || str_contains($lowerTitle, 'wren') || str_contains($lowerTitle, 'tlinh') || str_contains($lowerTitle, 'low g');
+        $isLongSet = $currentDuration > 1200; // > 20 minutes nonstop
 
-        // Formulate smart recommendation query
-        $searchTerms = [];
-        if (!empty($cleanArtist) && !str_contains(strtolower($cleanArtist), 'creator')) {
-            $searchTerms[] = $cleanArtist;
+        // 2. Select rich, diverse query pools based on vibe
+        if ($isLongSet) {
+            $pool = [
+                'nonstop vinahouse 2026 cực căng bass',
+                'vietmix nonstop hot tiktok 2026',
+                'nhạc edm nonstop bass cực mạnh quẩy',
+            ];
+        } elseif ($isRemix) {
+            $pool = [
+                'nhạc trẻ remix hot tiktok 2026',
+                'top bài hát remix việt nam thịnh hành',
+                'bật tình yêu lên remix',
+                'cắt đôi nỗi sầu remix',
+                'ngày chưa giông bão remix',
+                'lạc trôi remix triple d',
+                'bên trên tầng lầu remix',
+                'waiting for you remix mono',
+                'tướng quân remix',
+                'đúng nhận sai cãi remix',
+            ];
+        } elseif ($isChill) {
+            $pool = [
+                'nhạc indie việt hay nhất',
+                'vũ bước qua nhau lạ lùng',
+                'chillies vùng ký ức mascara có em đời bỗng vui',
+                'hoàng dũng nàng thơ đôi lời đoạn kết mới',
+                'đen vâu trốn tìm lối nhỏ đi về nhà mười năm',
+                'nhạc lofi việt nhẹ nhàng thư giãn',
+                'ngọt bài ca say em dạo này',
+                'thịnh suy một đêm say chuyen rang',
+            ];
+        } elseif ($isRap) {
+            $pool = [
+                'hieuthuhai không thể say hẹn gặp em dưới ánh trăng ngủ một mình',
+                'mck chìm sâu tại vì sao va vào giai điệu này',
+                'wren evans từng quen bé iu call me',
+                'rap việt hot trend triệu view',
+                'double2t à lôi người miền núi chất',
+                'grey d đưa em về nhà vaicaunoicokhiennguoithaydoi',
+            ];
+        } else {
+            $pool = [
+                'top hits vpop 2026 triệu view',
+                'sơn tùng mtp đừng làm trái tim anh đau',
+                'mono em là waiting for you',
+                'vũ cát tường từng là',
+                'phương mỹ chi bóng phù hoa vũ trụ có anh',
+                'trịnh thăng bình người ấy tâm sự tuổi 30',
+                'nhạc edm audius trending',
+            ];
         }
-        if (!empty($cleanKeywords)) {
-            $searchTerms[] = $cleanKeywords;
+
+        // Randomize pool and pick 2 distinct queries
+        shuffle($pool);
+        $selectedQueries = array_slice($pool, 0, 2);
+
+        $collectedTracks = [];
+        foreach ($selectedQueries as $q) {
+            $res = $this->searchUnified($q);
+            if (!empty($res['tracks'])) {
+                $collectedTracks = array_merge($collectedTracks, $res['tracks']);
+            }
         }
 
-        $query = implode(' ', $searchTerms) ?: 'nhạc trẻ remix hot trend';
-        if (str_contains(strtolower($cleanTitle), 'remix')) {
-            $query .= ' remix hot tiktok';
-        }
+        // 3. Extract core words of the current song to filter out same-song duplicates
+        $cleanWords = preg_replace('/(\(.*?\)|\(.*|\[.*?\]|ft\..*?|-|\/)/i', ' ', mb_strtolower($cleanTitle));
+        $titleKeywords = array_values(array_filter(explode(' ', $cleanWords), function ($w) {
+            return mb_strlen($w) >= 3 && !in_array($w, ['nhạc', 'bản', 'full', 'official', 'video', 'audio', 'remix', 'beat', 'lyric', 'lyrics', 'cover', 'live']);
+        }));
 
-        $res = $this->searchUnified($query);
-        $tracks = $res['tracks'] ?? [];
-
-        // Filter out the currently playing track
-        $filtered = array_values(array_filter($tracks, function ($t) use ($currentTrackId, $cleanTitle) {
+        // 4. Strict filtering:
+        //    - Must be a DIFFERENT song
+        //    - Must have SIMILAR duration
+        //    - Must not be a reaction, karaoke beat, or tutorial
+        $filtered = array_values(array_filter($collectedTracks, function ($t) use ($currentTrackId, $titleKeywords, $isLongSet, $currentDuration) {
             if ($currentTrackId && $t['id'] === $currentTrackId) return false;
             if (isset($t['youtube_id']) && $currentTrackId && str_contains($currentTrackId, $t['youtube_id'])) return false;
+
+            $tTitleLower = mb_strtolower($t['title']);
+
+            // Filter out same-song variations (e.g. Live, Karaoke, Reaction of the same song)
+            if (count($titleKeywords) > 0) {
+                $matchCount = 0;
+                foreach ($titleKeywords as $kw) {
+                    if (str_contains($tTitleLower, $kw)) {
+                        $matchCount++;
+                    }
+                }
+                if ($matchCount >= min(2, count($titleKeywords))) {
+                    return false;
+                }
+            }
+
+            // Exclude noise titles
+            if (str_contains($tTitleLower, 'reaction') || str_contains($tTitleLower, 'karaoke') || str_contains($tTitleLower, 'hướng dẫn') || str_contains($tTitleLower, 'review')) {
+                return false;
+            }
+
+            // Duration matching
+            $tDuration = (int)($t['duration'] ?? 200);
+            if (!$isLongSet) {
+                // For normal songs (3-6 mins): exclude 1-2 hour livestreams and clips < 60s
+                if ($tDuration > 600 || $tDuration < 60) return false;
+            } else {
+                // For nonstop sets: must be > 15 mins
+                if ($tDuration < 900) return false;
+            }
+
             return true;
         }));
 
-        // If fewer than 5 recommendations, supplement with trending
-        if (count($filtered) < 6) {
-            $trending = $this->getAudiusTrending(8);
-            $filtered = array_merge($filtered, $trending);
+        // 5. Deduplicate by unique track ID & title
+        $unique = [];
+        $seen = [];
+        foreach ($filtered as $t) {
+            $key = $t['id'] . '_' . Str::slug($t['title']);
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $unique[] = $t;
+            }
         }
 
-        return array_slice($filtered, 0, 12);
+        // 6. Shuffle for fresh, exciting variety every time
+        shuffle($unique);
+
+        return array_slice($unique, 0, 15);
     }
 
     /**
