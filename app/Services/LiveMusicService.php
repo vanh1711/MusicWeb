@@ -24,7 +24,7 @@ class LiveMusicService
      */
     public function getAudiusTrending(int $limit = 12): array
     {
-        return Cache::remember('audius_trending_v7', 600, function () use ($limit) {
+        return Cache::remember('audius_trending_v8', 600, function () use ($limit) {
             $host = $this->getAudiusHost();
             $url = "{$host}/v1/tracks/trending?app_name={$this->appName}&limit={$limit}";
 
@@ -159,8 +159,29 @@ class LiveMusicService
     }
 
     /**
-     * Smart Vibe- & Duration-Aware Recommendation Engine
-     * Strictly enforces 100% DISTINCT songs (max 1 version per song title signature across the queue)!
+     * Check if a track belongs to Vietnamese Music
+     */
+    public function isVietnameseMusic(string $title, string $artist = ''): bool
+    {
+        $text = mb_strtolower($title . ' ' . $artist);
+
+        // Has Vietnamese accented characters
+        if (preg_match('/[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/u', $text)) {
+            return true;
+        }
+
+        // Has whole-word Vietnamese tokens or phrases
+        if (preg_match('/\b(nhac|nhạc|viet|việt|vpop|vinahouse|vietmix|son tung|sơn tùng|den vau|đen vâu|hieuthuhai|tang duy tan|tăng duy tân|hoang dung|hoàng dũng|chillies|thinh suy|thịnh suy|phuong my chi|phương mỹ chi|vu cat tuong|vũ cát tường|trinh thang binh|trịnh thăng bình|double2t|grey d|tlinh|low g|wren evans|jack|j97|mono)\b/u', $text)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Smart Vibe-, Language- & Duration-Aware Recommendation Engine
+     * Enforces 100% LANGUAGE CONSISTENCY: Vietnamese songs only recommend Vietnamese songs!
+     * Enforces 100% DISTINCT SONGS: Max 1 track per song signature.
      */
     public function getRecommendations(string $title, ?string $artistName = null, ?string $currentTrackId = null, int $currentDuration = 240): array
     {
@@ -168,67 +189,93 @@ class LiveMusicService
         $cleanArtist = trim($artistName ?: '');
         $lowerInfo = mb_strtolower($cleanTitle . ' ' . $cleanArtist);
 
-        // 1. Detect Category / Vibe
+        // 1. Detect Language / Region
+        $isVN = $this->isVietnameseMusic($cleanTitle, $cleanArtist);
+
+        // 2. Detect Category / Vibe
         $isRemix = str_contains($lowerInfo, 'remix') || str_contains($lowerInfo, 'vinahouse') || str_contains($lowerInfo, 'viet mix') || str_contains($lowerInfo, 'speed up') || str_contains($lowerInfo, 'nightcore');
         $isChill = str_contains($lowerInfo, 'chill') || str_contains($lowerInfo, 'lofi') || str_contains($lowerInfo, 'acoustic') || str_contains($lowerInfo, 'indie') || str_contains($lowerInfo, 'đen') || str_contains($lowerInfo, 'vũ') || str_contains($lowerInfo, 'chillies') || str_contains($lowerInfo, 'hoàng dũng') || str_contains($lowerInfo, 'ngọt');
         $isRap = str_contains($lowerInfo, 'rap') || str_contains($lowerInfo, 'hip hop') || str_contains($lowerInfo, 'hieuthuhai') || str_contains($lowerInfo, 'mck') || str_contains($lowerInfo, 'wren') || str_contains($lowerInfo, 'tlinh') || str_contains($lowerInfo, 'low g');
         $isLongSet = $currentDuration > 1200; // > 20 mins
 
-        // 2. Select wide query pools
-        if ($isLongSet) {
-            $pool = [
-                'nonstop vinahouse 2026 cực căng bass',
-                'vietmix nonstop hot tiktok 2026',
-                'nhạc edm nonstop bass cực mạnh quẩy',
-            ];
-        } elseif ($isRemix) {
-            $pool = [
-                'nhạc trẻ remix bxh hot tiktok 2026',
-                'lạc trôi remix triple d',
-                'cắt đôi nỗi sầu remix',
-                'ngày chưa giông bão remix',
-                'bật tình yêu lên remix',
-                'bên trên tầng lầu remix',
-                'anh chưa thương em đến vậy đâu remix',
-                'đúng nhận sai cãi remix',
-                'waiting for you remix mono',
-                'tướng quân remix',
-                'về bên anh remix',
-            ];
-        } elseif ($isChill) {
-            $pool = [
-                'nhạc indie việt nhẹ nhàng hay nhất',
-                'vũ bước qua nhau lạ lùng',
-                'chillies vùng ký ức mascara có em đời bỗng vui',
-                'hoàng dũng nàng thơ đôi lời đoạn kết mới',
-                'đen vâu trốn tìm lối nhỏ đi về nhà',
-                'ngọt bài ca say em dạo này thấy chưa',
-                'thịnh suy một đêm say chuyen rang',
-            ];
-        } elseif ($isRap) {
-            $pool = [
-                'hieuthuhai không thể say hẹn gặp em dưới ánh trăng',
-                'mck chìm sâu tại vì sao va vào giai điệu này',
-                'wren evans từng quen bé iu call me',
-                'double2t à lôi người miền núi chất',
-                'grey d đưa em về nhà vaicaunoicokhiennguoithaydoi',
-            ];
+        // 3. Select language-appropriate query pools
+        if ($isVN) {
+            // === VIETNAMESE MUSIC ONLY ===
+            if ($isLongSet) {
+                $pool = [
+                    'nonstop vinahouse 2026 cực căng bass việt mix',
+                    'vietmix nonstop hot tiktok 2026 bay phòng',
+                ];
+            } elseif ($isRemix) {
+                $pool = [
+                    'nhạc trẻ remix bxh hot tiktok 2026',
+                    'lạc trôi remix triple d',
+                    'cắt đôi nỗi sầu remix tang duy tan',
+                    'ngày chưa giông bão remix',
+                    'bật tình yêu lên remix',
+                    'bên trên tầng lầu remix',
+                    'anh chưa thương em đến vậy đâu remix',
+                    'đúng nhận sai cãi remix',
+                    'về bên anh remix jack',
+                    'đế vương remix',
+                    'tổng hợp nhạc remix việt hay nhất',
+                ];
+            } elseif ($isChill) {
+                $pool = [
+                    'vũ bước qua nhau lạ lùng',
+                    'chillies vùng ký ức mascara có em đời bỗng vui',
+                    'hoàng dũng nàng thơ đôi lời đoạn kết mới',
+                    'đen vâu trốn tìm lối nhỏ đi về nhà',
+                    'ngọt bài ca say em dạo này thấy chưa',
+                    'thịnh suy một đêm say chuyen rang',
+                    'tuyển tập nhạc indie việt chill nhẹ nhàng',
+                ];
+            } elseif ($isRap) {
+                $pool = [
+                    'hieuthuhai không thể say hẹn gặp em dưới ánh trăng',
+                    'mck chìm sâu tại vì sao va vào giai điệu này',
+                    'wren evans từng quen bé iu call me',
+                    'double2t à lôi người miền núi chất',
+                    'grey d đưa em về nhà vaicaunoicokhiennguoithaydoi',
+                    'top rap việt hot trend triệu view',
+                ];
+            } else {
+                $pool = [
+                    'sơn tùng mtp đừng làm trái tim anh đau chúng ta của tương lai',
+                    'mono em là waiting for you',
+                    'vũ cát tường từng là',
+                    'phương mỹ chi bóng phù hoa vũ trụ có anh',
+                    'trịnh thăng bình người ấy tâm sự tuổi 30',
+                    'top hits vpop 2026 triệu view bxh',
+                ];
+            }
         } else {
-            $pool = [
-                'top hits vpop 2026 triệu view bxh',
-                'sơn tùng mtp đừng làm trái tim anh đau chúng ta của tương lai',
-                'mono em là waiting for you',
-                'vũ cát tường từng là',
-                'phương mỹ chi bóng phù hoa vũ trụ có anh',
-                'trịnh thăng bình người ấy tâm sự tuổi 30',
-            ];
+            // === INTERNATIONAL MUSIC ONLY ===
+            if ($isLongSet) {
+                $pool = [
+                    'best edm festival mix 2026 nonstop',
+                    'club dance party nonstop mix',
+                ];
+            } elseif ($isRemix) {
+                $pool = [
+                    'top edm remix club festival 2026',
+                    'alan walker faded remix',
+                    'the chainsmokers closer remix',
+                    'avicii levels remix',
+                ];
+            } else {
+                $pool = [
+                    'top hits international pop 2026',
+                    'taylor swift edm acoustic hits',
+                    'billie eilish hits',
+                ];
+            }
         }
 
-        // Shuffle pool and query 3 distinct themes
+        // Shuffle pool and query 5 distinct themes for maximum diversity
         shuffle($pool);
-        $selectedQueries = array_slice($pool, 0, 3);
+        $selectedQueries = array_slice($pool, 0, 5);
 
-        // Query pools in parallel
         $collectedTracks = [];
         foreach ($selectedQueries as $q) {
             $res = $this->searchUnified($q);
@@ -237,16 +284,16 @@ class LiveMusicService
             }
         }
 
-        // Also add Audius trending for global flavor
-        if ($isRemix) {
-            $audiusTrending = $this->getAudiusTrending(4);
+        // Only add Audius trending if playing International music
+        if (!$isVN) {
+            $audiusTrending = $this->getAudiusTrending(6);
             $collectedTracks = array_merge($collectedTracks, $audiusTrending);
         }
 
-        // 3. Current track signature (to strictly exclude the current playing song)
+        // 4. Current track signature
         $currentSig = $this->getSongSignature($cleanTitle, $cleanArtist);
 
-        // 4. Strict Deduplication by Song Title Signature (Max 1 version per song title)
+        // 5. Strict Deduplication & Language Filter
         $seenSignatures = [];
         if (!empty($currentSig)) {
             $seenSignatures[$currentSig] = true;
@@ -259,24 +306,34 @@ class LiveMusicService
             if (isset($t['youtube_id']) && $currentTrackId && str_contains($currentTrackId, $t['youtube_id'])) continue;
 
             $tTitleLower = mb_strtolower($t['title']);
+            $tArtistName = $t['artist']['name'] ?? '';
 
-            // Exclude noise (reactions, karaoke, reviews)
+            // Exclude noise
             if (str_contains($tTitleLower, 'reaction') || str_contains($tTitleLower, 'karaoke') || str_contains($tTitleLower, 'hướng dẫn') || str_contains($tTitleLower, 'review') || str_contains($tTitleLower, 'talkshow')) {
+                continue;
+            }
+
+            // Strict Language Matching
+            $trackIsVN = $this->isVietnameseMusic($t['title'], $tArtistName);
+            if ($isVN && !$trackIsVN) {
+                // Skip English / international tracks when playing Vietnamese music!
+                continue;
+            } elseif (!$isVN && $trackIsVN) {
+                // Skip Vietnamese tracks when playing International music!
                 continue;
             }
 
             // Duration matching
             $tDuration = (int)($t['duration'] ?? 200);
             if (!$isLongSet) {
-                if ($tDuration > 600 || $tDuration < 60) continue; // 1 to 10 mins
+                if ($tDuration > 600 || $tDuration < 60) continue;
             } else {
-                if ($tDuration < 900) continue; // > 15 mins for nonstop
+                if ($tDuration < 900) continue;
             }
 
             // Extract Song Signature
-            $sig = $this->getSongSignature($t['title'], $t['artist']['name'] ?? '');
+            $sig = $this->getSongSignature($t['title'], $tArtistName);
 
-            // If signature already exists in the queue, SKIP IT to prevent duplicate songs!
             if (!empty($sig)) {
                 if (isset($seenSignatures[$sig])) {
                     continue;
@@ -287,14 +344,14 @@ class LiveMusicService
             $uniqueTracks[] = $t;
         }
 
-        // 5. Shuffle to give fresh, delightful variety
+        // 6. Shuffle for fresh, natural radio vibe
         shuffle($uniqueTracks);
 
         return array_slice($uniqueTracks, 0, 15);
     }
 
     /**
-     * Extract Normalized 2-Word Core Song Signature to identify duplicate versions of the same song
+     * Extract Normalized 2-Word Core Song Signature
      */
     public function getSongSignature(string $title, string $artist = ''): string
     {
