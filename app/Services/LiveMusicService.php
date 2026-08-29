@@ -12,32 +12,34 @@ class LiveMusicService
         'https://discoveryprovider.audius.co',
         'https://discoveryprovider2.audius.co',
         'https://discoveryprovider3.audius.co',
-        'https://audius-discovery-1.cultur3stake.com',
     ];
 
-    /**
-     * Get active Audius host
-     */
     protected function getAudiusHost(): string
     {
         return $this->audiusHosts[array_rand($this->audiusHosts)];
     }
 
     /**
-     * Fetch trending tracks from Audius (Open Music Platform, full length 320kbps)
+     * Fetch trending tracks from Audius with caching
      */
     public function getAudiusTrending(int $limit = 12): array
     {
-        return Cache::remember('audius_trending_live_v3', 300, function () use ($limit) {
+        return Cache::remember('audius_trending_v4', 600, function () use ($limit) {
             $host = $this->getAudiusHost();
             $url = "{$host}/v1/tracks/trending?app_name={$this->appName}&limit={$limit}";
 
-            $ctx = stream_context_create(['http' => ['timeout' => 5, 'header' => 'User-Agent: VanhSound/2.0']]);
-            $response = @file_get_contents($url, false, $ctx);
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 3,
+                CURLOPT_USERAGENT => 'VanhSound/2.0',
+            ]);
+            $res = curl_exec($ch);
+            curl_close($ch);
 
-            if (!$response) return [];
+            if (!$res) return [];
 
-            $json = json_decode($response, true);
+            $json = json_decode($res, true);
             $tracks = $json['data'] ?? [];
 
             return array_map([$this, 'formatAudiusTrack'], $tracks);
@@ -45,161 +47,182 @@ class LiveMusicService
     }
 
     /**
-     * Search Audius tracks (Full length 320kbps EDM, Trap, Remix, Lofi)
-     */
-    public function searchAudius(string $query, int $limit = 8): array
-    {
-        $host = $this->getAudiusHost();
-        $url = "{$host}/v1/tracks/search?query=" . urlencode($query) . "&app_name={$this->appName}&limit={$limit}";
-
-        $ctx = stream_context_create(['http' => ['timeout' => 4, 'header' => 'User-Agent: VanhSound/2.0']]);
-        $response = @file_get_contents($url, false, $ctx);
-
-        if (!$response) return [];
-
-        $json = json_decode($response, true);
-        $tracks = $json['data'] ?? [];
-
-        return array_map([$this, 'formatAudiusTrack'], $tracks);
-    }
-
-    /**
-     * Search Open Remix, Vinahouse, TikTok, V-Pop & International (100% Full Length, No 30s Limit)
-     */
-    public function searchOpenMusic(string $query, int $limit = 12): array
-    {
-        $cacheKey = 'open_music_' . md5($query) . '_' . $limit;
-
-        return Cache::remember($cacheKey, 180, function () use ($query, $limit) {
-            $q = urlencode($query);
-            $url = "https://www.youtube.com/results?search_query={$q}";
-
-            $ctx = stream_context_create([
-                'http' => [
-                    'timeout' => 4,
-                    'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\nAccept-Language: vi,en;q=0.9",
-                ],
-            ]);
-
-            $html = @file_get_contents($url, false, $ctx);
-            if (!$html) return [];
-
-            if (!preg_match('/ytInitialData\s*=\s*({.+?});<\/script>/s', $html, $m)) {
-                return [];
-            }
-
-            $data = json_decode($m[1], true);
-            $contents = $data['contents']['twoColumnSearchResultsRenderer']['primaryContents']['sectionListRenderer']['contents'][0]['itemSectionRenderer']['contents'] ?? [];
-            $tracks = [];
-
-            foreach ($contents as $item) {
-                if (isset($item['videoRenderer'])) {
-                    $vr = $item['videoRenderer'];
-                    $title = $vr['title']['runs'][0]['text'] ?? '';
-                    $videoId = $vr['videoId'] ?? '';
-                    $channel = $vr['ownerText']['runs'][0]['text'] ?? 'Open Creator';
-                    $durationText = $vr['lengthText']['simpleText'] ?? '3:45';
-                    $viewCountText = $vr['viewCountText']['simpleText'] ?? ($vr['shortViewCountText']['simpleText'] ?? '1.2M lượt xem');
-
-                    // Filter out livestreams without duration
-                    if (empty($videoId) || empty($title) || empty($vr['lengthText'])) continue;
-
-                    // High-res YouTube thumbnail
-                    $thumbnail = "https://i.ytimg.com/vi/{$videoId}/hqdefault.jpg";
-
-                    $durationSeconds = $this->parseDurationText($durationText);
-
-                    // Estimate plays count from view count text
-                    $playsCount = $this->parsePlaysCount($viewCountText);
-
-                    $tracks[] = [
-                        'id' => 'yt_' . $videoId,
-                        'youtube_id' => $videoId,
-                        'title' => $title,
-                        'duration' => $durationSeconds,
-                        'duration_formatted' => $durationText,
-                        'audio_url' => "https://www.youtube.com/watch?v={$videoId}",
-                        'cover_url' => $thumbnail,
-                        'display_cover_url' => $thumbnail,
-                        'plays_count' => $playsCount,
-                        'genre' => 'Remix & Open Sound',
-                        'waveform_data' => $this->generateWaveform($videoId),
-                        'lyrics_lrc' => "[00:00.00] (VanhSound Open Remix Network • Bản Full {$durationText})\n[00:05.00] Đang phát: {$title}\n[00:10.00] Kênh phát hành: {$channel}\n[00:15.00] Thưởng thức trọn vẹn toàn bộ bài hát chất lượng cao không giới hạn...",
-                        'source' => 'youtube',
-                        'artist' => [
-                            'id' => 'art_yt_' . Str::slug($channel),
-                            'name' => $channel,
-                            'slug' => Str::slug($channel),
-                            'avatar_url' => $thumbnail,
-                            'monthly_listeners' => rand(800000, 15000000),
-                            'is_verified' => true,
-                        ],
-                        'album' => [
-                            'id' => 'alb_yt_' . $videoId,
-                            'title' => $title . ' (Full Track)',
-                            'slug' => Str::slug($title . '-full'),
-                            'cover_url' => $thumbnail,
-                            'type' => 'single',
-                        ],
-                    ];
-
-                    if (count($tracks) >= $limit) break;
-                }
-            }
-
-            return $tracks;
-        });
-    }
-
-    /**
-     * Unified Search: Queries Open Remix Network + Audius API (Full Length Tracks 100%)
+     * Unified Ultra-Fast Parallel Search (YouTubei + Audius in parallel via curl_multi)
      */
     public function searchUnified(string $query): array
     {
         $cleanQuery = trim($query);
-        if (empty($cleanQuery)) return ['tracks' => [], 'artists' => [], 'albums' => []];
-
-        // 1. Query Open Remix / YouTube Network (Full tracks, remixes, V-Pop, TikTok)
-        $openTracks = $this->searchOpenMusic($cleanQuery, 10);
-
-        // 2. Query Audius API (EDM, International, Trap)
-        $audiusTracks = $this->searchAudius($cleanQuery, 5);
-
-        $mergedTracks = array_merge($openTracks, $audiusTracks);
-
-        // Extract artists & albums
-        $artists = [];
-        $albums = [];
-        $seenArtists = [];
-        $seenAlbums = [];
-
-        foreach ($mergedTracks as $t) {
-            $artName = $t['artist']['name'] ?? 'Artist';
-            $albName = $t['album']['title'] ?? 'Single';
-
-            if (!isset($seenArtists[$artName])) {
-                $seenArtists[$artName] = true;
-                $artists[] = $t['artist'];
-            }
-
-            if (!isset($seenAlbums[$albName])) {
-                $seenAlbums[$albName] = true;
-                $albums[] = $t['album'];
-            }
+        if (empty($cleanQuery) || strlen($cleanQuery) < 2) {
+            return ['query' => $cleanQuery, 'top_result' => null, 'tracks' => [], 'artists' => [], 'albums' => []];
         }
 
-        return [
-            'query' => $cleanQuery,
-            'top_result' => $mergedTracks[0] ?? null,
-            'tracks' => $mergedTracks,
-            'artists' => array_slice($artists, 0, 6),
-            'albums' => array_slice($albums, 0, 6),
-            'playlists' => [],
-        ];
+        $cacheKey = 'unified_search_fast_' . md5(mb_strtolower($cleanQuery));
+
+        return Cache::remember($cacheKey, 3600, function () use ($cleanQuery) {
+            $mh = curl_multi_init();
+
+            // 1. YouTubei Fast JSON API Handle
+            $ytPayload = json_encode([
+                'context' => [
+                    'client' => [
+                        'clientName' => 'WEB',
+                        'clientVersion' => '2.20231201.00.00',
+                        'hl' => 'vi',
+                        'gl' => 'VN',
+                    ]
+                ],
+                'query' => $cleanQuery,
+            ]);
+
+            $chYt = curl_init('https://www.youtube.com/youtubei/v1/search?prettyPrint=false');
+            curl_setopt_array($chYt, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $ytPayload,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                ],
+                CURLOPT_TIMEOUT => 3,
+            ]);
+            curl_multi_add_handle($mh, $chYt);
+
+            // 2. Audius Search Handle
+            $host = $this->getAudiusHost();
+            $audiusUrl = "{$host}/v1/tracks/search?query=" . urlencode($cleanQuery) . "&app_name={$this->appName}&limit=6";
+            $chAudius = curl_init($audiusUrl);
+            curl_setopt_array($chAudius, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 3,
+                CURLOPT_USERAGENT => 'VanhSound/2.0',
+            ]);
+            curl_multi_add_handle($mh, $chAudius);
+
+            // Execute in parallel
+            $running = null;
+            do {
+                curl_multi_exec($mh, $running);
+                curl_multi_select($mh, 0.1);
+            } while ($running > 0);
+
+            $ytContent = curl_multi_getcontent($chYt);
+            $audiusContent = curl_multi_getcontent($chAudius);
+
+            curl_multi_remove_handle($mh, $chYt);
+            curl_multi_remove_handle($mh, $chAudius);
+            curl_multi_close($mh);
+
+            // Parse YouTube results
+            $ytTracks = $this->parseYouTubeiResults($ytContent);
+
+            // Parse Audius results
+            $audiusTracks = [];
+            if ($audiusContent) {
+                $aJson = json_decode($audiusContent, true);
+                if (isset($aJson['data']) && is_array($aJson['data'])) {
+                    $audiusTracks = array_map([$this, 'formatAudiusTrack'], $aJson['data']);
+                }
+            }
+
+            $mergedTracks = array_merge($ytTracks, $audiusTracks);
+
+            // Extract artists & albums
+            $artists = [];
+            $albums = [];
+            $seenArtists = [];
+            $seenAlbums = [];
+
+            foreach ($mergedTracks as $t) {
+                $artName = $t['artist']['name'] ?? 'Artist';
+                $albName = $t['album']['title'] ?? 'Single';
+
+                if (!isset($seenArtists[$artName])) {
+                    $seenArtists[$artName] = true;
+                    $artists[] = $t['artist'];
+                }
+
+                if (!isset($seenAlbums[$albName])) {
+                    $seenAlbums[$albName] = true;
+                    $albums[] = $t['album'];
+                }
+            }
+
+            return [
+                'query' => $cleanQuery,
+                'top_result' => $mergedTracks[0] ?? null,
+                'tracks' => $mergedTracks,
+                'artists' => array_slice($artists, 0, 6),
+                'albums' => array_slice($albums, 0, 6),
+                'playlists' => [],
+            ];
+        });
     }
 
     /**
-     * Standardize Audius track object (Full 320kbps stream)
+     * Fast parser for YouTubei JSON response
+     */
+    protected function parseYouTubeiResults(?string $jsonStr): array
+    {
+        if (empty($jsonStr)) return [];
+
+        $data = json_decode($jsonStr, true);
+        $sections = $data['contents']['twoColumnSearchResultsRenderer']['primaryContents']['sectionListRenderer']['contents'][0]['itemSectionRenderer']['contents'] ?? [];
+        $tracks = [];
+
+        foreach ($sections as $item) {
+            if (isset($item['videoRenderer'])) {
+                $vr = $item['videoRenderer'];
+                $title = $vr['title']['runs'][0]['text'] ?? '';
+                $videoId = $vr['videoId'] ?? '';
+                $channel = $vr['ownerText']['runs'][0]['text'] ?? 'Open Creator';
+                $durationText = $vr['lengthText']['simpleText'] ?? '3:45';
+                $viewCountText = $vr['viewCountText']['simpleText'] ?? ($vr['shortViewCountText']['simpleText'] ?? '1.5M');
+
+                if (empty($videoId) || empty($title) || empty($vr['lengthText'])) continue;
+
+                $thumbnail = "https://i.ytimg.com/vi/{$videoId}/hqdefault.jpg";
+                $durationSeconds = $this->parseDurationText($durationText);
+
+                $tracks[] = [
+                    'id' => 'yt_' . $videoId,
+                    'youtube_id' => $videoId,
+                    'title' => $title,
+                    'duration' => $durationSeconds,
+                    'duration_formatted' => $durationText,
+                    'audio_url' => "https://www.youtube.com/watch?v={$videoId}",
+                    'cover_url' => $thumbnail,
+                    'display_cover_url' => $thumbnail,
+                    'plays_count' => $this->parsePlaysCount($viewCountText),
+                    'genre' => 'Remix & Open Sound',
+                    'waveform_data' => $this->generateWaveform($videoId),
+                    'lyrics_lrc' => "[00:00.00] (VanhSound Open Remix • Full {$durationText})\n[00:05.00] Đang phát: {$title}\n[00:10.00] Kênh phát hành: {$channel}\n[00:15.00] Thưởng thức trọn vẹn toàn bộ bài hát chất lượng cao không giới hạn...",
+                    'source' => 'youtube',
+                    'artist' => [
+                        'id' => 'art_yt_' . Str::slug($channel),
+                        'name' => $channel,
+                        'slug' => Str::slug($channel),
+                        'avatar_url' => $thumbnail,
+                        'monthly_listeners' => rand(1200000, 25000000),
+                        'is_verified' => true,
+                    ],
+                    'album' => [
+                        'id' => 'alb_yt_' . $videoId,
+                        'title' => $title . ' (Full Track)',
+                        'slug' => Str::slug($title . '-full'),
+                        'cover_url' => $thumbnail,
+                        'type' => 'single',
+                    ],
+                ];
+
+                if (count($tracks) >= 12) break;
+            }
+        }
+
+        return $tracks;
+    }
+
+    /**
+     * Standardize Audius track object
      */
     public function formatAudiusTrack(array $track): array
     {
@@ -252,9 +275,6 @@ class LiveMusicService
         ];
     }
 
-    /**
-     * Parse duration text like "4:24" or "1:05:30" to seconds
-     */
     protected function parseDurationText(string $text): int
     {
         $parts = array_map('intval', explode(':', $text));
@@ -266,9 +286,6 @@ class LiveMusicService
         return 210;
     }
 
-    /**
-     * Parse plays count
-     */
     protected function parsePlaysCount(string $text): int
     {
         if (preg_match('/([\d\.,]+)\s*([M|K|Tr|N|k|m]?)/i', $text, $m)) {
@@ -284,9 +301,6 @@ class LiveMusicService
         return rand(1000000, 25000000);
     }
 
-    /**
-     * Generate 75-point waveform array
-     */
     protected function generateWaveform($seed): array
     {
         $hash = crc32((string)$seed);

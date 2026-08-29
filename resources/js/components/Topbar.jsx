@@ -11,38 +11,77 @@ import {
   LogOut,
   Sparkles,
   UploadCloud,
-  LogIn,
-  UserPlus
+  Loader2
 } from 'lucide-react';
 import axios from 'axios';
 import { useAudioStore } from '../store/useAudioStore';
 import { useAuthStore } from '../store/useAuthStore';
 
+// In-memory client-side cache for 0ms instant search responses
+const clientSearchCache = new Map();
+
 export default function Topbar({ onUploadOpen }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const searchRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   const { playTrack } = useAudioStore();
   const { user, isAuthenticated, logout, openLoginModal, openRegisterModal } = useAuthStore();
 
-  // Search debounce handler with Universal Resolver
+  // High-performance search debounce with in-memory caching & request cancellation
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const query = searchQuery.trim();
+    if (!query) {
       setSearchResults(null);
+      setIsSearching(false);
       return;
     }
 
-    const timer = setTimeout(() => {
-      axios.get(`/api/search?q=${encodeURIComponent(searchQuery)}`).then((res) => {
+    // 1. Instant 0ms cache hit
+    const cacheKey = query.toLowerCase();
+    if (clientSearchCache.has(cacheKey)) {
+      setSearchResults(clientSearchCache.get(cacheKey));
+      setIsDropdownOpen(true);
+      setIsSearching(false);
+      return;
+    }
+
+    // 2. Cancel previous pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setIsSearching(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await axios.get(`/api/search?q=${encodeURIComponent(query)}`, {
+          signal: abortControllerRef.current.signal,
+        });
+
+        // Store in cache
+        clientSearchCache.set(cacheKey, res.data);
+        if (clientSearchCache.size > 50) {
+          const firstKey = clientSearchCache.keys().next().value;
+          clientSearchCache.delete(firstKey);
+        }
+
         setSearchResults(res.data);
         setIsDropdownOpen(true);
-      }).catch(() => {});
-    }, 250);
+      } catch (err) {
+        if (!axios.isCancel(err)) {
+          console.warn('Search request error:', err);
+        }
+      } finally {
+        setIsSearching(false);
+      }
+    }, 280);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -83,13 +122,18 @@ export default function Topbar({ onUploadOpen }) {
         {/* Live Universal Search Input */}
         <div className="relative flex-1" ref={searchRef}>
           <div className="relative flex items-center">
-            <Search className="w-4 h-4 absolute left-3.5 text-[#8A8F98] pointer-events-none" />
+            {isSearching ? (
+              <Loader2 className="w-4 h-4 absolute left-3.5 text-[#5E6AD2] animate-spin pointer-events-none" />
+            ) : (
+              <Search className="w-4 h-4 absolute left-3.5 text-[#8A8F98] pointer-events-none" />
+            )}
+
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => { if (searchResults) setIsDropdownOpen(true); }}
-              placeholder="Tìm kiếm bất kỳ bài hát, nghệ sĩ (Sơn Tùng, Đen Vâu, Taylor Swift)..."
+              placeholder="Tìm kiếm bài hát, remix, nghệ sĩ (Người Ấy Remix, Sơn Tùng, EDM)..."
               className="w-full h-10 pl-10 pr-9 rounded-full bg-[#0a0a0c] border border-white/[0.08] focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/30 text-xs sm:text-sm text-[#EDEDEF] placeholder-[#8A8F98] outline-none transition-all"
             />
             {searchQuery && (
@@ -107,17 +151,21 @@ export default function Topbar({ onUploadOpen }) {
             <div className="absolute top-12 left-0 right-0 glass-dropdown rounded-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-200 shadow-2xl">
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {/* Top Tracks */}
-                {searchResults.tracks?.length > 0 && (
+                {searchResults.tracks?.length > 0 ? (
                   <div>
-                    <span className="text-[11px] font-mono uppercase tracking-wider text-[#8A8F98] px-2 block mb-1">
-                      Bài hát
-                    </span>
+                    <div className="flex items-center justify-between px-2 mb-1">
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-[#8A8F98]">
+                        Bài hát & Remix ({searchResults.tracks.length})
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400">Full Track 100%</span>
+                    </div>
+
                     <div className="space-y-1">
-                      {searchResults.tracks.slice(0, 4).map((t) => (
+                      {searchResults.tracks.slice(0, 5).map((t, idx) => (
                         <div
-                          key={t.id}
+                          key={`${t.id}-${idx}`}
                           onClick={() => {
-                            playTrack(t);
+                            playTrack(t, searchResults.tracks);
                             setIsDropdownOpen(false);
                           }}
                           className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.06] cursor-pointer group transition-colors"
@@ -125,7 +173,7 @@ export default function Topbar({ onUploadOpen }) {
                           <img
                             src={t.cover_url || t.display_cover_url}
                             alt={t.title}
-                            className="w-9 h-9 rounded-lg object-cover"
+                            className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-white group-hover:text-[#5E6AD2] truncate">
@@ -137,6 +185,10 @@ export default function Topbar({ onUploadOpen }) {
                         </div>
                       ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-xs text-[#8A8F98]">
+                    Không tìm thấy bài hát phù hợp.
                   </div>
                 )}
 
@@ -179,7 +231,7 @@ export default function Topbar({ onUploadOpen }) {
                   }}
                   className="p-2 text-center text-xs font-semibold text-[#5E6AD2] hover:text-[#6872D9] cursor-pointer border-t border-white/[0.06]"
                 >
-                  Xem tất cả kết quả cho "{searchQuery}" →
+                  Xem toàn bộ kết quả cho "{searchQuery}" →
                 </div>
               </div>
             </div>
@@ -189,7 +241,6 @@ export default function Topbar({ onUploadOpen }) {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
-        {/* Upload Button */}
         <button
           onClick={onUploadOpen}
           className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#5E6AD2] to-[#EC4899] hover:opacity-90 active:scale-95 text-xs font-bold text-white shadow-accent-glow transition-all"
@@ -198,7 +249,6 @@ export default function Topbar({ onUploadOpen }) {
           <span className="hidden sm:inline">Tải Nhạc Lên</span>
         </button>
 
-        {/* Auth State / Profile */}
         {isAuthenticated && user ? (
           <div className="relative">
             <button
@@ -215,7 +265,6 @@ export default function Topbar({ onUploadOpen }) {
               </span>
             </button>
 
-            {/* Profile Dropdown */}
             {isProfileOpen && (
               <div className="absolute right-0 top-12 w-52 glass-dropdown rounded-2xl p-2 z-50 shadow-2xl">
                 <div className="px-3 py-2 border-b border-white/[0.06]">
