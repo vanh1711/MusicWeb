@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-// Global single HTML5 Audio element instance
 let globalAudio = null;
 let globalYTPlayer = null;
 let ytPollInterval = null;
@@ -23,10 +22,11 @@ export const useAudioStore = create((set, get) => ({
 
   // Queue & Playlist State
   queue: [],
-  queueIndex: -1,
+  queueIndex: 0,
   history: [],
   isShuffled: false,
   repeatMode: 'off', // 'off' | 'all' | 'one'
+  isLoadingRecommendations: false,
 
   // UI Panels State
   isLyricsOpen: false,
@@ -80,6 +80,14 @@ export const useAudioStore = create((set, get) => ({
       globalAudio.addEventListener('pause', () => {
         if (get().currentTrack?.source !== 'youtube') set({ isPlaying: false });
       });
+
+      globalAudio.addEventListener('error', (e) => {
+        console.warn('HTML5 Audio notice:', e);
+        // If error, try next track
+        if (get().isPlaying) {
+          setTimeout(() => get().nextTrack(), 1000);
+        }
+      });
     }
 
     // 2. Initialize YouTube IFrame Audio API player (hidden)
@@ -87,8 +95,8 @@ export const useAudioStore = create((set, get) => ({
       if (window.YT && window.YT.Player && !globalYTPlayer) {
         try {
           globalYTPlayer = new window.YT.Player('vanhsound-yt-player', {
-            height: '1',
-            width: '1',
+            height: '200',
+            width: '200',
             playerVars: {
               autoplay: 1,
               controls: 0,
@@ -96,6 +104,7 @@ export const useAudioStore = create((set, get) => ({
               fs: 0,
               modestbranding: 1,
               playsinline: 1,
+              origin: window.location.origin,
             },
             events: {
               onReady: (event) => {
@@ -118,10 +127,15 @@ export const useAudioStore = create((set, get) => ({
                   }
                 }
               },
+              onError: (event) => {
+                console.warn('YouTube playback error code:', event.data);
+                // Auto skip on unplayable video
+                setTimeout(() => get().nextTrack(), 800);
+              },
             },
           });
         } catch (err) {
-          console.warn('YouTube Player init notice:', err);
+          console.warn('YouTube Player init error:', err);
         }
       }
     };
@@ -198,32 +212,57 @@ export const useAudioStore = create((set, get) => ({
     }).catch(() => {});
   },
 
-  // Play a specific track (supports Audius 320kbps full track, YouTube full remix, and MP3)
+  // Fetch smart recommendations and append to queue
+  fetchRecommendations: async (track) => {
+    if (!track) return;
+    set({ isLoadingRecommendations: true });
+
+    try {
+      const res = await axios.get('/api/recommendations', {
+        params: {
+          title: track.title,
+          artist: track.artist?.name || '',
+          track_id: track.id,
+        },
+      });
+
+      const recs = res.data.tracks || [];
+      if (recs.length > 0) {
+        set((state) => {
+          // Append recommended tracks avoiding duplicates
+          const existingIds = new Set(state.queue.map(t => t.id));
+          const newUniqueRecs = recs.filter(t => !existingIds.has(t.id));
+
+          return {
+            queue: [...state.queue, ...newUniqueRecs],
+            isLoadingRecommendations: false,
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch recommendations:', err);
+    } finally {
+      set({ isLoadingRecommendations: false });
+    }
+  },
+
+  // Play a specific track
   playTrack: (track, newQueue = null) => {
     if (!track) return;
     get().initAudio();
 
-    let queue = get().queue;
-    let queueIndex = get().queueIndex;
+    let queue = [];
+    let queueIndex = 0;
 
-    if (newQueue && Array.isArray(newQueue) && newQueue.length > 0) {
+    if (newQueue && Array.isArray(newQueue) && newQueue.length > 1) {
+      // User clicked a track from an explicit list/playlist
       queue = [...newQueue];
-      queueIndex = queue.findIndex(t => t.id === track.id);
-      if (queueIndex === -1) {
-        queue.unshift(track);
-        queueIndex = 0;
-      }
-    } else if (queue.length === 0) {
+      const idx = queue.findIndex(t => t.id === track.id);
+      queueIndex = idx !== -1 ? idx : 0;
+    } else {
+      // User played a single track (from search, quick pick, etc.)
       queue = [track];
       queueIndex = 0;
-    } else {
-      const idx = queue.findIndex(t => t.id === track.id);
-      if (idx !== -1) {
-        queueIndex = idx;
-      } else {
-        queue = [track, ...queue];
-        queueIndex = 0;
-      }
     }
 
     const isYT = track.source === 'youtube' || !!track.youtube_id;
@@ -240,14 +279,12 @@ export const useAudioStore = create((set, get) => ({
     });
 
     if (isYT && ytVideoId) {
-      // 1. Play Full Length via YouTube background engine
       if (globalAudio) globalAudio.pause();
 
       if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
         globalYTPlayer.loadVideoById(ytVideoId);
         globalYTPlayer.playVideo();
       } else {
-        // Retry when ready
         setTimeout(() => {
           if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
             globalYTPlayer.loadVideoById(ytVideoId);
@@ -256,7 +293,6 @@ export const useAudioStore = create((set, get) => ({
         }, 500);
       }
     } else {
-      // 2. Play Full Length 320kbps via HTML5 Audio (Audius / MP3)
       if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
         globalYTPlayer.pauseVideo();
       }
@@ -269,7 +305,7 @@ export const useAudioStore = create((set, get) => ({
       }
     }
 
-    // Media Session API for native OS lock screen
+    // Media Session API
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
@@ -286,6 +322,9 @@ export const useAudioStore = create((set, get) => ({
       navigator.mediaSession.setActionHandler('nexttrack', () => get().nextTrack());
       navigator.mediaSession.setActionHandler('seekto', (details) => get().seek(details.seekTime || 0));
     }
+
+    // Automatically trigger background smart recommendations to populate upcoming queue!
+    get().fetchRecommendations(track);
 
     if (track.id) {
       axios.post(`/api/tracks/${track.id}/play`).catch(() => {});
@@ -362,7 +401,7 @@ export const useAudioStore = create((set, get) => ({
   },
 
   nextTrack: () => {
-    const { queue, queueIndex, isShuffled, playTrack } = get();
+    const { queue, queueIndex, isShuffled, playTrack, currentTrack } = get();
     if (queue.length === 0) return;
 
     let nextIdx = queueIndex + 1;
@@ -370,11 +409,50 @@ export const useAudioStore = create((set, get) => ({
       nextIdx = Math.floor(Math.random() * queue.length);
     }
 
-    if (nextIdx >= queue.length) {
-      nextIdx = 0; // loop back to first track
-    }
+    if (nextIdx < queue.length) {
+      // Move to the next queued/recommended song!
+      const nextSong = queue[nextIdx];
+      
+      // Update queue index and play
+      set({ queueIndex: nextIdx });
+      
+      // Play through same queue without wiping it
+      const isYT = nextSong.source === 'youtube' || !!nextSong.youtube_id;
+      const ytVideoId = nextSong.youtube_id || (isYT ? String(nextSong.id).replace('yt_', '') : null);
 
-    playTrack(queue[nextIdx], queue);
+      set({
+        currentTrack: nextSong,
+        isPlaying: true,
+        currentTime: 0,
+        duration: nextSong.duration || 0,
+        bufferedTime: 0,
+      });
+
+      if (isYT && ytVideoId) {
+        if (globalAudio) globalAudio.pause();
+        if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
+          globalYTPlayer.loadVideoById(ytVideoId);
+          globalYTPlayer.playVideo();
+        }
+      } else {
+        if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
+          globalYTPlayer.pauseVideo();
+        }
+        if (globalAudio && nextSong.audio_url) {
+          globalAudio.src = nextSong.audio_url;
+          globalAudio.play().catch(() => {});
+        }
+      }
+
+      // If near end of queue, fetch more recommendations
+      if (nextIdx >= queue.length - 2) {
+        get().fetchRecommendations(nextSong);
+      }
+    } else {
+      // Reached end, loop or fetch fresh recommendations
+      get().fetchRecommendations(currentTrack);
+      set({ queueIndex: 0 });
+    }
   },
 
   prevTrack: () => {
@@ -389,7 +467,36 @@ export const useAudioStore = create((set, get) => ({
     if (prevIdx < 0) {
       prevIdx = queue.length - 1;
     }
-    playTrack(queue[prevIdx], queue);
+
+    const prevSong = queue[prevIdx];
+    set({ queueIndex: prevIdx });
+
+    const isYT = prevSong.source === 'youtube' || !!prevSong.youtube_id;
+    const ytVideoId = prevSong.youtube_id || (isYT ? String(prevSong.id).replace('yt_', '') : null);
+
+    set({
+      currentTrack: prevSong,
+      isPlaying: true,
+      currentTime: 0,
+      duration: prevSong.duration || 0,
+      bufferedTime: 0,
+    });
+
+    if (isYT && ytVideoId) {
+      if (globalAudio) globalAudio.pause();
+      if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
+        globalYTPlayer.loadVideoById(ytVideoId);
+        globalYTPlayer.playVideo();
+      }
+    } else {
+      if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
+        globalYTPlayer.pauseVideo();
+      }
+      if (globalAudio && prevSong.audio_url) {
+        globalAudio.src = prevSong.audio_url;
+        globalAudio.play().catch(() => {});
+      }
+    }
   },
 
   toggleShuffle: () => {

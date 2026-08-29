@@ -145,6 +145,23 @@ class MusicController extends Controller
     }
 
     /**
+     * Get Recommended Related Tracks (Autoplay & Up-Next)
+     */
+    public function recommendations(Request $request)
+    {
+        $title = $request->get('title', '');
+        $artist = $request->get('artist', '');
+        $trackId = $request->get('track_id', '');
+
+        $tracks = $this->liveMusic->getRecommendations($title, $artist, $trackId);
+
+        return response()->json([
+            'title' => $title,
+            'tracks' => $tracks,
+        ]);
+    }
+
+    /**
      * Artist profile details (Supports both local and live fetched artists)
      */
     public function artistDetail($slug)

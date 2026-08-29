@@ -97,7 +97,11 @@ export default function PlayerBar() {
     <footer className="h-22 bg-[#08080a]/95 backdrop-blur-2xl border-t border-white/[0.08] px-5 flex items-center justify-between select-none relative z-40 shadow-2xl">
       {/* 1. Left: Track Info & Quick Actions */}
       <div className="flex items-center gap-3.5 w-1/4 min-w-[220px]">
-        <div className="relative group flex-shrink-0">
+        <div 
+          onClick={toggleQueue}
+          className="relative group flex-shrink-0 cursor-pointer"
+          title="Xem danh sách bài hát kế tiếp & gợi ý"
+        >
           <img
             src={currentTrack.cover_url || currentTrack.display_cover_url}
             alt={currentTrack.title}
@@ -114,7 +118,7 @@ export default function PlayerBar() {
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden">
+          <div className="overflow-hidden" onClick={toggleQueue} title="Xem danh sách bài hát kế tiếp & gợi ý">
             <h4 className="text-sm font-semibold text-white hover:text-[#5E6AD2] cursor-pointer transition-colors truncate">
               {currentTrack.title}
             </h4>

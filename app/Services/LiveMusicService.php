@@ -24,7 +24,7 @@ class LiveMusicService
      */
     public function getAudiusTrending(int $limit = 12): array
     {
-        return Cache::remember('audius_trending_v4', 600, function () use ($limit) {
+        return Cache::remember('audius_trending_v5', 600, function () use ($limit) {
             $host = $this->getAudiusHost();
             $url = "{$host}/v1/tracks/trending?app_name={$this->appName}&limit={$limit}";
 
@@ -156,6 +156,51 @@ class LiveMusicService
                 'playlists' => [],
             ];
         });
+    }
+
+    /**
+     * Get Recommended Related Tracks (Autoplay Radio & Up-Next Station)
+     */
+    public function getRecommendations(string $title, ?string $artistName = null, ?string $currentTrackId = null): array
+    {
+        $cleanArtist = trim($artistName ?: '');
+        $cleanTitle = trim($title);
+
+        // Remove extra clutter from title like "(Official MV)", "[Audio]", "(M/V)"
+        $cleanKeywords = preg_replace('/(\(.*?\)|\(.*|\[.*?\])/i', '', $cleanTitle);
+        $cleanKeywords = trim($cleanKeywords);
+
+        // Formulate smart recommendation query
+        $searchTerms = [];
+        if (!empty($cleanArtist) && !str_contains(strtolower($cleanArtist), 'creator')) {
+            $searchTerms[] = $cleanArtist;
+        }
+        if (!empty($cleanKeywords)) {
+            $searchTerms[] = $cleanKeywords;
+        }
+
+        $query = implode(' ', $searchTerms) ?: 'nhạc trẻ remix hot trend';
+        if (str_contains(strtolower($cleanTitle), 'remix')) {
+            $query .= ' remix hot tiktok';
+        }
+
+        $res = $this->searchUnified($query);
+        $tracks = $res['tracks'] ?? [];
+
+        // Filter out the currently playing track
+        $filtered = array_values(array_filter($tracks, function ($t) use ($currentTrackId, $cleanTitle) {
+            if ($currentTrackId && $t['id'] === $currentTrackId) return false;
+            if (isset($t['youtube_id']) && $currentTrackId && str_contains($currentTrackId, $t['youtube_id'])) return false;
+            return true;
+        }));
+
+        // If fewer than 5 recommendations, supplement with trending
+        if (count($filtered) < 6) {
+            $trending = $this->getAudiusTrending(8);
+            $filtered = array_merge($filtered, $trending);
+        }
+
+        return array_slice($filtered, 0, 12);
     }
 
     /**
