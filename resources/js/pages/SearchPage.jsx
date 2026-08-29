@@ -131,7 +131,7 @@ export default function SearchPage() {
 
                 <SpotlightCard
                   className="p-6 flex flex-col justify-between h-56 cursor-pointer group relative"
-                  onClick={() => playTrack(results.top_result, results.tracks)}
+                  onClick={() => playTrack(results.top_result)}
                 >
                   <div className="flex items-center gap-4">
                     <img
@@ -178,7 +178,7 @@ export default function SearchPage() {
               ) : (
                 <div className="space-y-1">
                   {results.tracks.map((t, idx) => (
-                    <TrackRow key={`${t.id}-${idx}`} track={t} index={idx} tracklist={results.tracks} />
+                    <TrackRow key={`${t.id}-${idx}`} track={t} index={idx} />
                   ))}
                 </div>
               )}

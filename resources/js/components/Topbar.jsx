@@ -165,7 +165,7 @@ export default function Topbar({ onUploadOpen }) {
                         <div
                           key={`${t.id}-${idx}`}
                           onClick={() => {
-                            playTrack(t, searchResults.tracks);
+                            playTrack(t);
                             setIsDropdownOpen(false);
                           }}
                           className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.06] cursor-pointer group transition-colors"
