@@ -292,7 +292,7 @@ export const useAudioStore = create((set, get) => ({
   // Auto-retry with embeddable Topic/Audio version when Error 150/101 happens
   retryWithAlternateStream: async (track, excludeId = '') => {
     if (!track || track._retried) {
-      get().nextTrack();
+      set({ isPlaying: false });
       return;
     }
 
@@ -323,14 +323,16 @@ export const useAudioStore = create((set, get) => ({
 
         if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
           globalYTPlayer.loadVideoById(altId);
+          globalYTPlayer.unMute();
+          globalYTPlayer.setVolume(get().volume * 100);
           globalYTPlayer.playVideo();
         }
       } else {
-        get().nextTrack();
+        set({ isPlaying: false });
       }
     } catch (err) {
       console.warn('Retry alternate stream error:', err);
-      get().nextTrack();
+      set({ isPlaying: false });
     }
   },
 
