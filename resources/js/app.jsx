@@ -7,6 +7,7 @@ import SearchPage from './pages/SearchPage';
 import AlbumPage from './pages/AlbumPage';
 import ArtistPage from './pages/ArtistPage';
 import PlaylistPage from './pages/PlaylistPage';
+import LikedSongsPage from './pages/LikedSongsPage';
 import TrackPage from './pages/TrackPage';
 
 function App() {
