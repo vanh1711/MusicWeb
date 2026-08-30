@@ -19,10 +19,11 @@ import {
   Tv2
 } from 'lucide-react';
 import { useAudioStore } from '../store/useAudioStore';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AddToPlaylistModal from './AddToPlaylistModal';
 
 export default function PlayerBar() {
+  const navigate = useNavigate();
   const {
     currentTrack,
     isPlaying,
@@ -65,6 +66,13 @@ export default function PlayerBar() {
 
   const isLiked = likedTrackIds.has(currentTrack.id);
 
+  const handleTrackClick = () => {
+    toggleRightPanel(true);
+    if (currentTrack?.id) {
+      navigate(`/track/${currentTrack.id}`);
+    }
+  };
+
   const formatTime = (secs) => {
     if (isNaN(secs) || secs < 0) return '0:00';
     const m = Math.floor(secs / 60);
@@ -90,12 +98,12 @@ export default function PlayerBar() {
   return (
     <>
       <footer className="h-22 bg-[#08080a]/95 backdrop-blur-2xl border-t border-white/[0.08] px-5 flex items-center justify-between select-none relative z-40 shadow-2xl">
-        {/* 1. Left: Track Info & Quick Actions (Clicking opens Right Big Cover View) */}
+        {/* 1. Left: Track Info & Quick Actions (Clicking opens Full Song View & Right Panel) */}
         <div className="flex items-center gap-3.5 w-1/4 min-w-[220px]">
           <div 
-            onClick={() => toggleRightPanel()}
+            onClick={handleTrackClick}
             className="relative group flex-shrink-0 cursor-pointer"
-            title="Nhấn để mở màn hình bài hát đang phát bên phải"
+            title="Nhấn để xem toàn bộ thông tin bài hát & màn hình lớn"
           >
             <img
               src={currentTrack.cover_url || currentTrack.display_cover_url}
@@ -115,8 +123,8 @@ export default function PlayerBar() {
           <div className="min-w-0 flex-1">
             <div 
               className="overflow-hidden cursor-pointer" 
-              onClick={() => toggleRightPanel()} 
-              title="Nhấn để mở màn hình bài hát đang phát bên phải"
+              onClick={handleTrackClick} 
+              title="Nhấn để xem toàn bộ thông tin bài hát & màn hình lớn"
             >
               <h4 className="text-sm font-semibold text-white hover:text-[#5E6AD2] transition-colors truncate">
                 {currentTrack.title}

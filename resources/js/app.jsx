@@ -7,7 +7,7 @@ import SearchPage from './pages/SearchPage';
 import AlbumPage from './pages/AlbumPage';
 import ArtistPage from './pages/ArtistPage';
 import PlaylistPage from './pages/PlaylistPage';
-import LikedSongsPage from './pages/LikedSongsPage';
+import TrackPage from './pages/TrackPage';
 
 function App() {
   return (
@@ -16,6 +16,7 @@ function App() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<HomePage />} />
           <Route path="search" element={<SearchPage />} />
+          <Route path="track/:id" element={<TrackPage />} />
           <Route path="album/:slug" element={<AlbumPage />} />
           <Route path="artist/:slug" element={<ArtistPage />} />
           <Route path="playlist/:id" element={<PlaylistPage />} />
