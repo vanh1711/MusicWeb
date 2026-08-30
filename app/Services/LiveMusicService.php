@@ -20,11 +20,83 @@ class LiveMusicService
     }
 
     /**
+     * Fetch synchronized LRC lyrics from open LRC database (LrcLib API)
+     */
+    public function fetchSyncedLyrics(string $title, ?string $artist = null, ?int $duration = 0): ?string
+    {
+        $cleanTitle = preg_replace('/(\(.*?\)|\(.*|\[.*?\]|ft\..*?|feat\..*?|official|music|video|mv|audio|remix|tik\s*tok|hot|bản|chuẩn|beat)/iu', '', $title);
+        $cleanTitle = trim($cleanTitle);
+        $cleanArtist = trim($artist ?: '');
+
+        $cacheKey = 'synced_lyrics_' . md5(mb_strtolower($cleanTitle . '_' . $cleanArtist));
+
+        return Cache::remember($cacheKey, 86400, function () use ($cleanTitle, $cleanArtist, $duration) {
+            // 1. Try exact match
+            $url = "https://lrclib.net/api/get?track_name=" . urlencode($cleanTitle);
+            if (!empty($cleanArtist)) {
+                $url .= "&artist_name=" . urlencode($cleanArtist);
+            }
+            if ($duration > 0) {
+                $url .= "&duration=" . $duration;
+            }
+
+            $ctx = stream_context_create(['http' => ['timeout' => 3, 'header' => 'User-Agent: VanhSound/2.0']]);
+            $res = @file_get_contents($url, false, $ctx);
+
+            if ($res) {
+                $json = json_decode($res, true);
+                if (!empty($json['syncedLyrics'])) {
+                    return $json['syncedLyrics'];
+                }
+                if (!empty($json['plainLyrics'])) {
+                    return $this->formatPlainToLrc($json['plainLyrics']);
+                }
+            }
+
+            // 2. Try search query fallback
+            $searchUrl = "https://lrclib.net/api/search?q=" . urlencode($cleanTitle . ' ' . $cleanArtist);
+            $searchRes = @file_get_contents($searchUrl, false, $ctx);
+            if ($searchRes) {
+                $items = json_decode($searchRes, true);
+                if (is_array($items) && !empty($items)) {
+                    foreach ($items as $it) {
+                        if (!empty($it['syncedLyrics'])) {
+                            return $it['syncedLyrics'];
+                        }
+                    }
+                    if (!empty($items[0]['plainLyrics'])) {
+                        return $this->formatPlainToLrc($items[0]['plainLyrics']);
+                    }
+                }
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * Convert plain lyrics to standard timed LRC format
+     */
+    protected function formatPlainToLrc(string $plain): string
+    {
+        $lines = array_filter(explode("\n", $plain), fn($l) => !empty(trim($l)));
+        $lrc = [];
+        $sec = 5;
+        foreach ($lines as $line) {
+            $m = floor($sec / 60);
+            $s = $sec % 60;
+            $lrc[] = sprintf("[%02d:%02d.00] %s", $m, $s, trim($line));
+            $sec += 4;
+        }
+        return implode("\n", $lrc);
+    }
+
+    /**
      * Fetch trending tracks from Audius with caching
      */
     public function getAudiusTrending(int $limit = 12): array
     {
-        return Cache::remember('audius_trending_v8', 600, function () use ($limit) {
+        return Cache::remember('audius_trending_v9', 600, function () use ($limit) {
             $host = $this->getAudiusHost();
             $url = "{$host}/v1/tracks/trending?app_name={$this->appName}&limit={$limit}";
 

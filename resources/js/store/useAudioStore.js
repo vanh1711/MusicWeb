@@ -30,6 +30,7 @@ export const useAudioStore = create((set, get) => ({
 
   // UI Panels State
   isLyricsOpen: false,
+  isFullScreenLyricsOpen: false,
   isQueueOpen: false,
   isFullscreen: false,
   likedTrackIds: new Set([1, 4, 6]),
@@ -327,6 +328,31 @@ export const useAudioStore = create((set, get) => ({
     // Automatically trigger background smart recommendations to populate upcoming queue!
     get().fetchRecommendations(track);
 
+    // Automatically fetch real synchronized LRC lyrics if not yet fetched
+    if (!track.lyrics_lrc || track.lyrics_lrc.includes('Đang phát:') || track.lyrics_lrc.includes('Thưởng thức')) {
+      axios.get('/api/lyrics', {
+        params: {
+          title: track.title,
+          artist: track.artist?.name || '',
+          duration: track.duration || 0,
+        }
+      }).then(res => {
+        if (res.data && res.data.lyrics_lrc) {
+          set(state => {
+            if (state.currentTrack?.id === track.id) {
+              return {
+                currentTrack: {
+                  ...state.currentTrack,
+                  lyrics_lrc: res.data.lyrics_lrc,
+                }
+              };
+            }
+            return state;
+          });
+        }
+      }).catch(() => {});
+    }
+
     if (track.id) {
       axios.post(`/api/tracks/${track.id}/play`).catch(() => {});
     }
@@ -513,6 +539,10 @@ export const useAudioStore = create((set, get) => ({
   },
 
   toggleLyrics: () => set((state) => ({ isLyricsOpen: !state.isLyricsOpen, isQueueOpen: false })),
+  toggleFullScreenLyrics: (force) => set((state) => ({ 
+    isFullScreenLyricsOpen: typeof force === 'boolean' ? force : !state.isFullScreenLyricsOpen,
+    isLyricsOpen: false 
+  })),
   toggleQueue: () => set((state) => ({ isQueueOpen: !state.isQueueOpen, isLyricsOpen: false })),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
 

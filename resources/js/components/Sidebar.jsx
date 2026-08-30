@@ -10,24 +10,35 @@ import {
   Sparkles,
   Flame,
   Radio,
-  Music2
+  Music2,
+  ListMusic
 } from 'lucide-react';
 import axios from 'axios';
 import VanhSoundLogo from './VanhSoundLogo';
+import { usePlaylistStore } from '../store/usePlaylistStore';
 
 export default function Sidebar({ onCreatePlaylistOpen, onUploadOpen }) {
-  const [playlists, setPlaylists] = useState([]);
+  const [featuredPlaylists, setFeaturedPlaylists] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { customPlaylists } = usePlaylistStore();
+
   useEffect(() => {
     axios.get('/api/browse/featured').then(res => {
       if (res.data && res.data.featured_playlists) {
-        setPlaylists(res.data.featured_playlists);
+        setFeaturedPlaylists(res.data.featured_playlists);
       }
     }).catch(() => {});
   }, []);
+
+  // Merge custom playlists from LocalStorage with featured playlists
+  const displayPlaylists = activeFilter === 'custom' 
+    ? customPlaylists 
+    : (activeFilter === 'featured' 
+        ? featuredPlaylists 
+        : [...customPlaylists, ...featuredPlaylists]);
 
   return (
     <aside className="w-64 flex-shrink-0 h-full flex flex-col bg-[#050506]/95 border-r border-white/[0.06] select-none z-30">
@@ -99,7 +110,7 @@ export default function Sidebar({ onCreatePlaylistOpen, onUploadOpen }) {
         <div className="h-px bg-white/[0.06]" />
       </div>
 
-      {/* Your Library Section */}
+      {/* Your Library Section with LocalStorage Sync */}
       <div className="flex-1 flex flex-col min-h-0 px-3">
         <div className="flex items-center justify-between px-3 py-2 text-[#8A8F98]">
           <div className="flex items-center gap-2">
@@ -108,7 +119,7 @@ export default function Sidebar({ onCreatePlaylistOpen, onUploadOpen }) {
           </div>
           <button
             onClick={onCreatePlaylistOpen}
-            title="Tạo Playlist Mới"
+            title="Tạo Playlist Mới (Lưu vào LocalStorage)"
             className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8A8F98] hover:text-white hover:bg-white/[0.08] transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -117,49 +128,68 @@ export default function Sidebar({ onCreatePlaylistOpen, onUploadOpen }) {
 
         {/* Filter Pills */}
         <div className="flex gap-1.5 px-2 py-1.5 overflow-x-auto no-scrollbar">
-          {['Tất cả', 'Playlists', 'Nghệ sĩ'].map((filter) => (
+          {[
+            { id: 'all', label: 'Tất cả' },
+            { id: 'custom', label: `Của bạn (${customPlaylists.length})` },
+            { id: 'featured', label: 'Tuyển tập' }
+          ].map((filter) => (
             <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                activeFilter === filter
-                  ? 'bg-white text-[#050506] font-semibold'
+              key={filter.id}
+              onClick={() => setActiveFilter(filter.id)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeFilter === filter.id
+                  ? 'bg-white text-[#050506] font-semibold shadow-sm'
                   : 'bg-white/[0.05] text-[#8A8F98] hover:text-[#EDEDEF] hover:bg-white/[0.08]'
               }`}
             >
-              {filter}
+              {filter.label}
             </button>
           ))}
         </div>
 
         {/* Scrollable Playlists List */}
         <div className="flex-1 overflow-y-auto mt-2 pr-1 space-y-1">
-          {/* Dynamic Playlists */}
-          {playlists.map((playlist) => (
-            <div
-              key={playlist.id}
-              onClick={() => navigate(`/playlist/${playlist.id}`)}
-              className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer group transition-all ${
-                location.pathname === `/playlist/${playlist.id}`
-                  ? 'bg-white/[0.08] text-white border border-white/[0.06]'
-                  : 'hover:bg-white/[0.04] text-[#8A8F98] hover:text-[#EDEDEF]'
-              }`}
-            >
-              <img
-                src={playlist.cover_url}
-                alt={playlist.title}
-                className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow-sm border border-white/[0.06] group-hover:scale-105 transition-transform"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#EDEDEF] group-hover:text-white truncate">
-                  {playlist.title}
-                </p>
-                <p className="text-xs text-[#8A8F98] truncate">
-                  Playlist • {playlist.tracks_count || playlist.tracks?.length || 0} bài
-                </p>
-              </div>
+          {displayPlaylists.length === 0 ? (
+            <div className="p-4 text-center text-xs text-[#8A8F98]">
+              Chưa có playlist nào. Nhấn dấu + để tạo mới!
             </div>
-          ))}
+          ) : (
+            displayPlaylists.map((playlist) => {
+              const isSelected = location.pathname === `/playlist/${playlist.id}`;
+              const trackCount = playlist.tracks?.length || playlist.tracks_count || 0;
+
+              return (
+                <div
+                  key={playlist.id}
+                  onClick={() => navigate(`/playlist/${playlist.id}`)}
+                  className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer group transition-all ${
+                    isSelected
+                      ? 'bg-white/[0.08] text-white border border-white/[0.08] shadow-sm'
+                      : 'hover:bg-white/[0.04] text-[#8A8F98] hover:text-[#EDEDEF]'
+                  }`}
+                >
+                  <img
+                    src={playlist.cover_url}
+                    alt={playlist.title}
+                    className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow-sm border border-white/[0.06] group-hover:scale-105 transition-transform"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#EDEDEF] group-hover:text-white truncate">
+                      {playlist.title}
+                    </p>
+                    <p className="text-xs text-[#8A8F98] truncate flex items-center gap-1.5">
+                      {playlist.is_custom && (
+                        <span className="text-[10px] font-mono text-[#5E6AD2] bg-[#5E6AD2]/10 px-1.5 py-0.2 rounded border border-[#5E6AD2]/20">
+                          Local
+                        </span>
+                      )}
+                      <span>Playlist • {trackCount} bài</span>
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -168,7 +198,7 @@ export default function Sidebar({ onCreatePlaylistOpen, onUploadOpen }) {
         <span className="font-mono">VanhSound v2.0</span>
         <span className="flex items-center gap-1 text-[#5E6AD2]">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-          SoundCloud Engine
+          LocalStorage Active
         </span>
       </div>
     </aside>

@@ -163,6 +163,25 @@ class MusicController extends Controller
     }
 
     /**
+     * Get Synchronized LRC Lyrics
+     */
+    public function lyrics(Request $request)
+    {
+        $title = $request->get('title', '');
+        $artist = $request->get('artist', '');
+        $duration = (int)$request->get('duration', 0);
+
+        $syncedLyrics = $this->liveMusic->fetchSyncedLyrics($title, $artist, $duration);
+
+        return response()->json([
+            'title' => $title,
+            'artist' => $artist,
+            'lyrics_lrc' => $syncedLyrics,
+            'has_lyrics' => !empty($syncedLyrics),
+        ]);
+    }
+
+    /**
      * Artist profile details (Supports both local and live fetched artists)
      */
     public function artistDetail($slug)

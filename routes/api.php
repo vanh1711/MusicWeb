@@ -33,6 +33,7 @@ Route::get('/genres/{slug}', [MusicController::class, 'genreDetail']);
 // 6. Search & Universal Resolver
 Route::get('/search', [MusicController::class, 'search']);
 Route::get('/recommendations', [MusicController::class, 'recommendations']);
+Route::get('/lyrics', [MusicController::class, 'lyrics']);
 
 // 7. Entities
 Route::get('/artists/{slug}', [MusicController::class, 'artistDetail']);

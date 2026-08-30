@@ -6,18 +6,21 @@ import PlayerBar from './PlayerBar';
 import LyricsDrawer from './LyricsDrawer';
 import QueueDrawer from './QueueDrawer';
 import FullScreenPlayer from './FullScreenPlayer';
+import FullScreenLyrics from './FullScreenLyrics';
 import CreatePlaylistModal from './CreatePlaylistModal';
 import UploadModal from './UploadModal';
 import AuthModal from './AuthModal';
 import { useAudioStore } from '../store/useAudioStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { usePlaylistStore } from '../store/usePlaylistStore';
 
 export default function AppLayout() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const { initAudio } = useAudioStore();
+  const { initAudio, isFullScreenLyricsOpen, toggleFullScreenLyrics } = useAudioStore();
   const { checkAuth } = useAuthStore();
+  const { activeToast } = usePlaylistStore();
 
   useEffect(() => {
     initAudio();
@@ -40,6 +43,14 @@ export default function AppLayout() {
           zIndex: -1 
         }} 
       />
+
+      {/* Global Toast Notification */}
+      {activeToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-[#18181b]/95 backdrop-blur-xl border border-white/10 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#5E6AD2] animate-ping" />
+          <span>{activeToast}</span>
+        </div>
+      )}
 
       {/* Ambient Multi-Layer Lighting Background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#0e0e17_0%,#050506_55%,#020203_100%)] pointer-events-none z-0" />
@@ -76,6 +87,10 @@ export default function AppLayout() {
 
       {/* Modals & Overlays */}
       <FullScreenPlayer />
+      <FullScreenLyrics
+        isOpen={isFullScreenLyricsOpen}
+        onClose={() => toggleFullScreenLyrics(false)}
+      />
       <CreatePlaylistModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

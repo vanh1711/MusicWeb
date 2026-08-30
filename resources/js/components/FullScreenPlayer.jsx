@@ -10,11 +10,14 @@ import {
   Repeat1, 
   Heart, 
   Volume2, 
-  VolumeX,
-  Volume1,
-  Sparkles
+  VolumeX, 
+  Volume1, 
+  Sparkles,
+  Maximize2,
+  Mic2
 } from 'lucide-react';
 import { useAudioStore } from '../store/useAudioStore';
+import LyricsPreviewCard from './LyricsPreviewCard';
 
 export default function FullScreenPlayer() {
   const {
@@ -37,6 +40,7 @@ export default function FullScreenPlayer() {
     toggleShuffle,
     toggleRepeat,
     toggleFullscreen,
+    toggleFullScreenLyrics,
     toggleLike,
   } = useAudioStore();
 
@@ -92,59 +96,69 @@ export default function FullScreenPlayer() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050506] flex flex-col justify-between p-8 md:p-12 overflow-hidden select-none animate-in fade-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-50 bg-[#050506] flex flex-col justify-between p-6 md:p-10 overflow-hidden select-none animate-in fade-in zoom-in-95 duration-300">
       {/* Dynamic Ambient Background Blurred Artwork */}
       <div 
         className="absolute inset-0 bg-cover bg-center filter blur-[140px] opacity-25 scale-125 pointer-events-none transition-all duration-1000"
         style={{ backgroundImage: `url(${currentTrack.cover_url || currentTrack.display_cover_url})` }}
       />
-      <div className="absolute inset-0 bg-[#050506]/70 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#050506] via-transparent to-[#050506]/80 pointer-events-none" />
 
-      {/* Top Header */}
+      {/* Top Bar */}
       <div className="relative z-10 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-white/[0.08] flex items-center justify-center border border-white/[0.08]">
-            <Sparkles className="w-4 h-4 text-[#5E6AD2]" />
-          </div>
-          <div>
-            <p className="text-xs font-mono uppercase tracking-widest text-[#8A8F98]">Playing from album</p>
-            <p className="text-sm font-semibold text-white">{currentTrack.album?.title || 'Singles Collection'}</p>
-          </div>
+          <div className="w-2 h-2 rounded-full bg-[#5E6AD2] animate-ping" />
+          <span className="text-xs font-mono uppercase tracking-widest text-[#8A8F98]">
+            Đang Phát Toàn Màn Hình
+          </span>
         </div>
 
-        <button
-          onClick={toggleFullscreen}
-          className="p-3 rounded-full bg-white/[0.08] hover:bg-white/[0.15] text-white transition-all shadow-md"
-          title="Exit Fullscreen (Esc/F)"
-        >
-          <Minimize2 className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              toggleFullscreen();
+              toggleFullScreenLyrics(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#135d66]/60 hover:bg-[#135d66] border border-white/20 text-white text-xs font-bold transition-all shadow-md"
+          >
+            <Mic2 className="w-4 h-4 text-emerald-300" />
+            <span>Mở Lời Bài Hát Karaoke</span>
+          </button>
+
+          <button
+            onClick={toggleFullscreen}
+            className="p-2.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#EDEDEF] hover:text-white transition-colors"
+            title="Thu nhỏ (F)"
+          >
+            <Minimize2 className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
-      {/* Center Stage: Artwork + Synced Lyrics */}
-      <div className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto w-full my-6 min-h-0">
-        {/* Left: Giant Vinyl Artwork */}
-        <div className="flex flex-col items-center lg:items-start justify-center">
-          <div className="relative group max-w-md w-full aspect-square">
+      {/* Center Layout: Album Artwork + Lyrics Preview Card (Image 1 style) */}
+      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center max-w-6xl mx-auto w-full my-auto">
+        {/* Left: Album Artwork & Info */}
+        <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+          <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-white/10 relative group">
             <img
               src={currentTrack.cover_url || currentTrack.display_cover_url}
               alt={currentTrack.title}
-              className="w-full h-full rounded-3xl object-cover shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_80px_rgba(94,106,210,0.2)] border border-white/[0.12] transition-transform duration-500 hover:scale-[1.02]"
+              className="w-full h-full rounded-3xl object-cover shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border border-white/[0.12] transition-transform duration-500 hover:scale-[1.02]"
             />
           </div>
 
-          <div className="mt-8 flex items-center justify-between w-full max-w-md">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+          <div className="mt-6 flex items-center justify-between w-full max-w-md">
+            <div className="min-w-0 pr-4">
+              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight truncate">
                 {currentTrack.title}
               </h2>
-              <p className="text-base text-[#8A8F98] mt-1 font-medium">
+              <p className="text-base text-[#8A8F98] mt-1 font-medium truncate">
                 {currentTrack.artist?.name}
               </p>
             </div>
             <button
               onClick={() => toggleLike(currentTrack.id)}
-              className={`p-3 rounded-full bg-white/[0.06] hover:bg-white/[0.12] transition-colors ${
+              className={`p-3 rounded-full bg-white/[0.06] hover:bg-white/[0.12] transition-colors flex-shrink-0 ${
                 isLiked ? 'text-[#EC4899]' : 'text-[#8A8F98] hover:text-white'
               }`}
             >
@@ -153,32 +167,14 @@ export default function FullScreenPlayer() {
           </div>
         </div>
 
-        {/* Right: Synced Lyrics Waterfall */}
-        <div className="h-[360px] lg:h-[440px] overflow-y-auto pr-4 space-y-6 flex flex-col justify-center no-scrollbar mask-gradient">
-          {parsedLyrics.length === 0 ? (
-            <div className="text-center text-[#8A8F98] py-12">
-              <p className="text-xl font-semibold text-white/80">Instrumental or No Lyrics</p>
-              <p className="text-sm text-[#8A8F98] mt-2">Immerse in the audio soundscape</p>
-            </div>
-          ) : (
-            parsedLyrics.map((line, idx) => {
-              const isActive = idx === activeIndex;
-              return (
-                <p
-                  key={idx}
-                  ref={isActive ? activeLineRef : null}
-                  onClick={() => seek(line.time)}
-                  className={`cursor-pointer transition-all duration-300 leading-snug font-bold ${
-                    isActive
-                      ? 'text-white text-3xl md:text-4xl scale-105 drop-shadow-[0_0_18px_rgba(94,106,210,0.6)] text-[#EDEDEF]'
-                      : 'text-white/30 text-2xl hover:text-white/70'
-                  }`}
-                >
-                  {line.text}
-                </p>
-              );
-            })
-          )}
+        {/* Right: Lyrics Preview Card (Image 1 style) */}
+        <div className="w-full max-w-md mx-auto lg:max-w-none">
+          <LyricsPreviewCard
+            onOpenFullLyrics={() => {
+              toggleFullscreen();
+              toggleFullScreenLyrics(true);
+            }}
+          />
         </div>
       </div>
 
@@ -218,12 +214,18 @@ export default function FullScreenPlayer() {
             <button onClick={prevTrack} className="text-[#8A8F98] hover:text-white transition-colors">
               <SkipBack className="w-7 h-7 fill-current" />
             </button>
+
             <button
               onClick={togglePlay}
-              className="w-14 h-14 rounded-full bg-white text-[#050506] hover:scale-105 active:scale-95 flex items-center justify-center shadow-xl transition-all"
+              className="w-14 h-14 rounded-full bg-white text-[#050506] flex items-center justify-center shadow-accent-glow hover:scale-105 active:scale-95 transition-all"
             >
-              {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current ml-1" />}
+              {isPlaying ? (
+                <Pause className="w-7 h-7 fill-current" />
+              ) : (
+                <Play className="w-7 h-7 fill-current ml-0.5" />
+              )}
             </button>
+
             <button onClick={nextTrack} className="text-[#8A8F98] hover:text-white transition-colors">
               <SkipForward className="w-7 h-7 fill-current" />
             </button>
