@@ -96,6 +96,12 @@ class MusicController extends Controller
             ]);
         }
 
+        return response()->json([
+            'success' => false,
+            'message' => 'No alternate stream found',
+        ], 404);
+    }
+
     /**
      * Resolve SoundCloud Track by URL
      */
