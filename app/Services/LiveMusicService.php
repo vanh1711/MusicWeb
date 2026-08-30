@@ -20,6 +20,41 @@ class LiveMusicService
     }
 
     /**
+     * Get track by ID (Audius, YouTube, Local DB or SoundCloud)
+     */
+    public function getTrackById(string $id): ?array
+    {
+        if (str_starts_with($id, 'audius_')) {
+            $rawId = str_replace('audius_', '', $id);
+            $host = $this->getAudiusHost();
+            $url = "{$host}/v1/tracks/{$rawId}?app_name={$this->appName}";
+            $ctx = stream_context_create(['http' => ['timeout' => 4, 'header' => 'User-Agent: VanhSound/2.0']]);
+            $res = @file_get_contents($url, false, $ctx);
+            if ($res) {
+                $json = json_decode($res, true);
+                if (!empty($json['data'])) {
+                    return $this->formatAudiusTrack($json['data']);
+                }
+            }
+        } elseif (is_numeric($id)) {
+            $track = Track::with(['artist', 'album'])->find((int)$id);
+            if ($track) {
+                return $track->toArray();
+            }
+        } elseif (str_starts_with($id, 'yt_')) {
+            $ytId = str_replace('yt_', '', $id);
+            $res = $this->searchUnified($ytId);
+            if (!empty($res['tracks'])) {
+                return $res['tracks'][0];
+            }
+        }
+
+        // Fallback search
+        $res = $this->searchUnified($id);
+        return !empty($res['tracks']) ? $res['tracks'][0] : null;
+    }
+
+    /**
      * Resolve SoundCloud Track metadata & stream from any URL
      */
     public function resolveSoundCloudTrack(string $url): ?array

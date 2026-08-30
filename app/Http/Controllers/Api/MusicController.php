@@ -127,6 +127,18 @@ class MusicController extends Controller
     }
 
     /**
+     * Get Track details by ID
+     */
+    public function trackDetail($id)
+    {
+        $track = $this->liveMusic->getTrackById($id);
+        if ($track) {
+            return response()->json(['track' => $track]);
+        }
+        return response()->json(['message' => 'Track not found'], 404);
+    }
+
+    /**
      * Get all genres
      */
     public function genres()

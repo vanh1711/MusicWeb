@@ -50,19 +50,29 @@ export default function TrackPage() {
       setTrack(currentTrack);
       fetchRecommendations(currentTrack);
       setIsLoading(false);
-    } else {
-      // Fetch track details
-      axios.get(`/api/search?q=${encodeURIComponent(id.replace('yt_', '').replace('audius_', ''))}`)
-        .then(res => {
-          if (res.data && res.data.tracks && res.data.tracks.length > 0) {
-            const found = res.data.tracks.find(t => String(t.id) === String(id)) || res.data.tracks[0];
-            setTrack(found);
-            fetchRecommendations(found);
-          }
-        })
-        .catch(err => console.error('Failed to load track:', err))
-        .finally(() => setIsLoading(false));
+      return;
     }
+
+    // Fetch track by universal ID
+    axios.get(`/api/tracks/${encodeURIComponent(id)}`)
+      .then(res => {
+        if (res.data && res.data.track) {
+          setTrack(res.data.track);
+          fetchRecommendations(res.data.track);
+        }
+      })
+      .catch(() => {
+        // Fallback search
+        axios.get(`/api/search?q=${encodeURIComponent(id.replace('yt_', '').replace('audius_', ''))}`)
+          .then(res => {
+            if (res.data && res.data.tracks && res.data.tracks.length > 0) {
+              setTrack(res.data.tracks[0]);
+              fetchRecommendations(res.data.tracks[0]);
+            }
+          })
+          .catch(() => {});
+      })
+      .finally(() => setIsLoading(false));
   }, [id, currentTrack?.id]);
 
   const fetchRecommendations = (targetTrack) => {
