@@ -115,8 +115,8 @@ export const useAudioStore = create((set, get) => ({
       if (window.YT && window.YT.Player && !globalYTPlayer) {
         try {
           globalYTPlayer = new window.YT.Player('vanhsound-yt-player', {
-            height: '200',
-            width: '200',
+            height: '240',
+            width: '240',
             playerVars: {
               autoplay: 1,
               controls: 0,
@@ -133,8 +133,10 @@ export const useAudioStore = create((set, get) => ({
                 const { currentTrack, isPlaying } = get();
                 if (currentTrack?.source === 'youtube' && isPlaying) {
                   const ytid = currentTrack.youtube_id || String(currentTrack.id).replace('yt_', '');
-                  event.target.loadVideoById(ytid);
-                  event.target.playVideo();
+                  if (ytid) {
+                    event.target.loadVideoById(ytid);
+                    event.target.playVideo();
+                  }
                 }
               },
               onStateChange: (event) => {
@@ -159,9 +161,11 @@ export const useAudioStore = create((set, get) => ({
               onError: (event) => {
                 console.warn('YouTube playback error code:', event.data);
                 const { currentTrack } = get();
-                if (currentTrack) {
+                if (currentTrack && !currentTrack._retried) {
                   const ytid = currentTrack.youtube_id || String(currentTrack.id).replace('yt_', '');
                   get().retryWithAlternateStream(currentTrack, ytid);
+                } else {
+                  set({ isPlaying: false });
                 }
               },
             },
@@ -172,10 +176,11 @@ export const useAudioStore = create((set, get) => ({
       }
     };
 
+    window.onYouTubeIframeAPIReady = initYT;
     if (window.YT && window.YT.Player) {
       initYT();
     } else {
-      window.onYouTubeIframeAPIReady = initYT;
+      setTimeout(initYT, 500);
     }
 
     // 3. Initialize SoundCloud Widget API
@@ -457,12 +462,17 @@ export const useAudioStore = create((set, get) => ({
 
       const playYTVideo = () => {
         if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
-          globalYTPlayer.loadVideoById(ytVideoId);
-          globalYTPlayer.unMute();
-          globalYTPlayer.setVolume(get().volume * 100);
-          globalYTPlayer.playVideo();
+          try {
+            globalYTPlayer.loadVideoById(ytVideoId);
+            globalYTPlayer.unMute();
+            globalYTPlayer.setVolume(get().volume * 100);
+            globalYTPlayer.playVideo();
+          } catch (e) {
+            console.warn('playYTVideo error:', e);
+          }
         } else {
-          setTimeout(playYTVideo, 300);
+          get().initAudio();
+          setTimeout(playYTVideo, 250);
         }
       };
       playYTVideo();
