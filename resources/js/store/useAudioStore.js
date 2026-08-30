@@ -117,7 +117,6 @@ export const useAudioStore = create((set, get) => ({
           globalYTPlayer = new window.YT.Player('vanhsound-yt-player', {
             height: '200',
             width: '200',
-            host: 'https://www.youtube-nocookie.com',
             playerVars: {
               autoplay: 1,
               controls: 0,

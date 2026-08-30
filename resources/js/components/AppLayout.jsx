@@ -35,10 +35,10 @@ export default function AppLayout() {
         id="vanhsound-yt-player" 
         style={{ 
           position: 'fixed', 
-          bottom: 2, 
-          right: 2, 
-          width: 2, 
-          height: 2, 
+          bottom: 0, 
+          right: 0, 
+          width: 200, 
+          height: 200, 
           opacity: 0.001, 
           pointerEvents: 'none', 
           zIndex: 1 
