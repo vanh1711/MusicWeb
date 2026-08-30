@@ -26,47 +26,54 @@ class MusicController extends Controller
     }
 
     /**
-     * Featured tracks & playlists for homepage
+     * Featured tracks & playlists for homepage (Vietnamese Hits & Global International Music)
      */
     public function featured()
     {
-        // 1. Seeded & Live V-Music Tracks
+        // 1. Live Global Trending from Audius API (Full length 320kbps MP3s)
+        $audiusTrending = $this->liveMusic->getAudiusTrending(12);
+
+        // 2. Seeded & Live V-Music Tracks
         $localTracks = Track::with(['artist', 'album'])
             ->where('is_featured', true)
             ->take(12)
             ->get()
             ->toArray();
 
-        // 2. Playlists
+        // 3. Playlists (Vietnamese & Global)
         $featuredPlaylists = Playlist::with(['user', 'tracks'])
             ->withCount('tracks')
             ->where('is_featured', true)
             ->orWhere('is_public', true)
-            ->take(6)
+            ->take(8)
             ->get();
 
-        // 3. Featured Artists
+        // 4. Featured Artists
         $featuredArtists = Artist::with('genre')
             ->where('is_verified', true)
             ->orderBy('monthly_listeners', 'desc')
             ->take(8)
             ->get();
 
-        // 4. New Releases
+        // 5. New Releases
         $newReleases = Album::with('artist')
             ->orderBy('release_date', 'desc')
             ->take(6)
             ->get();
 
-        // 5. Quick Picks: 100% Vietnamese Hits
-        $quickPicks = array_slice($localTracks, 0, 8);
+        // 6. Quick Picks: Rich blend of V-Pop & Global Trending Hits
+        $quickPicks = array_merge(
+            array_slice($localTracks, 0, 4),
+            array_slice($audiusTrending, 0, 4)
+        );
 
         return response()->json([
-            'featured_tracks' => $localTracks,
+            'featured_tracks' => array_merge($localTracks, $audiusTrending),
             'featured_playlists' => $featuredPlaylists,
             'featured_artists' => $featuredArtists,
             'new_releases' => $newReleases,
             'quick_picks' => $quickPicks,
+            'audius_trending' => $audiusTrending,
         ]);
     }
 

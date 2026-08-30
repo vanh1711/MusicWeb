@@ -112,17 +112,19 @@ export const useAudioStore = create((set, get) => ({
           globalYTPlayer = new window.YT.Player('vanhsound-yt-player', {
             height: '200',
             width: '200',
+            host: 'https://www.youtube-nocookie.com',
             playerVars: {
               autoplay: 1,
               controls: 0,
               disablekb: 1,
               fs: 0,
-              modestbranding: 1,
               playsinline: 1,
-              origin: window.location.origin,
+              rel: 0,
+              enablejsapi: 1,
             },
             events: {
               onReady: (event) => {
+                event.target.unMute();
                 event.target.setVolume(get().volume * 100);
                 const { currentTrack, isPlaying } = get();
                 if (currentTrack?.source === 'youtube' && isPlaying) {

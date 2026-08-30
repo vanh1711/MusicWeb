@@ -30,18 +30,18 @@ export default function AppLayout() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden flex flex-col bg-[#050506] text-[#EDEDEF]">
-      {/* Hidden YouTube IFrame Audio Engine (Full-Length Open Streams) */}
+      {/* YouTube IFrame Audio Engine (Active on-screen for 100% unrestricted playback) */}
       <div 
         id="vanhsound-yt-player" 
         style={{ 
           position: 'fixed', 
-          bottom: 0, 
-          left: -9999, 
-          width: 200, 
-          height: 200, 
-          opacity: 0, 
+          bottom: 2, 
+          right: 2, 
+          width: 2, 
+          height: 2, 
+          opacity: 0.001, 
           pointerEvents: 'none',
-          zIndex: -1 
+          zIndex: 1 
         }} 
       />
 
