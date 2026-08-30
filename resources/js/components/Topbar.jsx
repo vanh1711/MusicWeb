@@ -133,7 +133,7 @@ export default function Topbar({ onUploadOpen }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => { if (searchResults) setIsDropdownOpen(true); }}
-              placeholder="Tìm kiếm bài hát, remix, nghệ sĩ (Người Ấy Remix, Sơn Tùng, EDM)..."
+              placeholder="Tìm kiếm bài hát, ca sĩ hoặc dán link SoundCloud (soundcloud.com)..."
               className="w-full h-10 pl-10 pr-9 rounded-full bg-[#0a0a0c] border border-white/[0.08] focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/30 text-xs sm:text-sm text-[#EDEDEF] placeholder-[#8A8F98] outline-none transition-all"
             />
             {searchQuery && (
@@ -150,6 +150,17 @@ export default function Topbar({ onUploadOpen }) {
           {isDropdownOpen && searchResults && (
             <div className="absolute top-12 left-0 right-0 glass-dropdown rounded-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-200 shadow-2xl">
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                {/* SoundCloud Detected Banner */}
+                {searchQuery.includes('soundcloud.com') && (
+                  <div className="p-2.5 rounded-xl bg-[#FF5500]/10 border border-[#FF5500]/30 flex items-center justify-between text-xs text-[#FF5500]">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#FF5500] animate-ping" />
+                      Đã nhận diện link SoundCloud
+                    </span>
+                    <span className="text-[10px] font-mono text-white/80">Phát trực tiếp</span>
+                  </div>
+                )}
+
                 {/* Top Tracks */}
                 {searchResults.tracks?.length > 0 ? (
                   <div>
@@ -165,7 +176,7 @@ export default function Topbar({ onUploadOpen }) {
                         <div
                           key={`${t.id}-${idx}`}
                           onClick={() => {
-                            playTrack(t);
+                            playTrack(t, searchResults.tracks);
                             setIsDropdownOpen(false);
                           }}
                           className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.06] cursor-pointer group transition-colors"
@@ -176,9 +187,16 @@ export default function Topbar({ onUploadOpen }) {
                             className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white group-hover:text-[#5E6AD2] truncate">
-                              {t.title}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium text-white group-hover:text-[#5E6AD2] truncate">
+                                {t.title}
+                              </p>
+                              {t.source === 'soundcloud' && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FF5500]/20 text-[#FF5500] border border-[#FF5500]/30 flex-shrink-0">
+                                  SoundCloud
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-[#8A8F98] truncate">{t.artist?.name}</p>
                           </div>
                           <span className="text-xs text-[#8A8F98] font-mono">{t.duration_formatted}</span>

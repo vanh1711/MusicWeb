@@ -14,8 +14,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-    <!-- YouTube IFrame Audio API for Full Length Open Stream -->
+    <!-- Audio Stream APIs (YouTube & SoundCloud Universal Engines) -->
     <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="https://w.soundcloud.com/player/api.js"></script>
 
     <!-- Vite Styles & Scripts -->
     @viteReactRefresh

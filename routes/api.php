@@ -35,6 +35,7 @@ Route::get('/search', [MusicController::class, 'search']);
 Route::get('/recommendations', [MusicController::class, 'recommendations']);
 Route::get('/lyrics', [MusicController::class, 'lyrics']);
 Route::get('/stream/resolve', [MusicController::class, 'resolveStream']);
+Route::get('/soundcloud/resolve', [MusicController::class, 'resolveSoundCloud']);
 
 // 7. Entities
 Route::get('/artists/{slug}', [MusicController::class, 'artistDetail']);

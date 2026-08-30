@@ -20,6 +20,87 @@ class LiveMusicService
     }
 
     /**
+     * Resolve SoundCloud Track metadata & stream from any URL
+     */
+    public function resolveSoundCloudTrack(string $url): ?array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 6,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+        ]);
+        $html = curl_exec($ch);
+        curl_close($ch);
+
+        if (empty($html)) return null;
+
+        $title = 'SoundCloud Track';
+        $artist = 'SoundCloud Creator';
+        $image = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80';
+        $duration = 210;
+
+        if (preg_match('/<meta property="og:title" content="(.*?)"/i', $html, $m)) {
+            $title = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        if (preg_match('/<meta property="og:image" content="(.*?)"/i', $html, $m)) {
+            $image = $m[1];
+        }
+        if (preg_match('/<meta property="og:description" content="(.*?)"/i', $html, $m)) {
+            $desc = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (preg_match('/Play (.*?) on SoundCloud/i', $desc, $mArtist)) {
+                $artist = $mArtist[1];
+            }
+        }
+
+        // Split artist & title if in "Artist - Title" format
+        if (str_contains($title, ' - ')) {
+            $parts = explode(' - ', $title, 2);
+            $artist = trim($parts[0]);
+            $title = trim($parts[1]);
+        } elseif (str_contains($title, ' by ')) {
+            $parts = explode(' by ', $title, 2);
+            $title = trim($parts[0]);
+            $artist = trim($parts[1]);
+        }
+
+        $id = 'sc_' . md5($url);
+
+        return [
+            'id' => $id,
+            'title' => $title,
+            'duration' => $duration,
+            'duration_formatted' => sprintf('%d:%02d', floor($duration / 60), $duration % 60),
+            'audio_url' => $url,
+            'soundcloud_url' => $url,
+            'cover_url' => $image,
+            'display_cover_url' => $image,
+            'plays_count' => rand(150000, 3500000),
+            'genre' => 'SoundCloud & Remix',
+            'waveform_data' => $this->generateWaveform($id),
+            'lyrics_lrc' => "[00:00.00] (SoundCloud Direct Stream)\n[00:05.00] Đang phát: {$title}\n[00:10.00] Nghệ sĩ: {$artist}\n[00:15.00] Thưởng thức bản thu gốc không giới hạn từ cộng đồng SoundCloud...",
+            'source' => 'soundcloud',
+            'artist' => [
+                'id' => 'art_' . Str::slug($artist),
+                'name' => $artist,
+                'slug' => Str::slug($artist),
+                'avatar_url' => $image,
+                'monthly_listeners' => rand(300000, 5000000),
+                'is_verified' => true,
+            ],
+            'album' => [
+                'id' => 'alb_' . $id,
+                'title' => $title . ' (SoundCloud Release)',
+                'slug' => Str::slug($title . '-sc'),
+                'cover_url' => $image,
+                'type' => 'single',
+            ],
+        ];
+    }
+
+    /**
      * Resolve embeddable alternate stream when an official MV has embedding restricted (Error 150/101)
      */
     public function resolveAlternateStream(string $title, ?string $artist = null, ?string $excludeId = null): ?array
@@ -161,6 +242,20 @@ class LiveMusicService
         $cacheKey = 'unified_search_fast_' . md5(mb_strtolower($cleanQuery));
 
         return Cache::remember($cacheKey, 3600, function () use ($cleanQuery) {
+            // Auto-detect direct SoundCloud links
+            if (str_contains($cleanQuery, 'soundcloud.com')) {
+                $scTrack = $this->resolveSoundCloudTrack($cleanQuery);
+                if ($scTrack) {
+                    return [
+                        'query' => $cleanQuery,
+                        'top_result' => $scTrack,
+                        'tracks' => [$scTrack],
+                        'artists' => [$scTrack['artist']],
+                        'albums' => [$scTrack['album']],
+                    ];
+                }
+            }
+
             $mh = curl_multi_init();
 
             // 1. YouTubei Fast JSON API Handle

@@ -3,6 +3,7 @@ import axios from 'axios';
 
 let globalAudio = null;
 let globalYTPlayer = null;
+let globalSCWidget = null;
 let ytPollInterval = null;
 let lastSeekTime = 0;
 
@@ -30,8 +31,8 @@ export const useAudioStore = create((set, get) => ({
   isLoadingRecommendations: false,
 
   // UI Panels State (Spotify 3-Column Layout)
-  isRightPanelOpen: true, // Right Now Playing Panel
-  rightPanelTab: 'now_playing', // 'now_playing' | 'queue' | 'lyrics'
+  isRightPanelOpen: true,
+  rightPanelTab: 'now_playing',
   isLyricsOpen: false,
   isFullScreenLyricsOpen: false,
   isQueueOpen: false,
@@ -44,7 +45,7 @@ export const useAudioStore = create((set, get) => ({
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab, isRightPanelOpen: true }),
 
-  // Init Audio & YouTube Listeners
+  // Init Audio, YouTube & SoundCloud Listeners
   initAudio: () => {
     if (typeof window === 'undefined') return;
 
@@ -54,7 +55,7 @@ export const useAudioStore = create((set, get) => ({
       globalAudio.volume = get().volume;
 
       globalAudio.addEventListener('timeupdate', () => {
-        if (get().currentTrack?.source !== 'youtube') {
+        if (get().currentTrack?.source !== 'youtube' && get().currentTrack?.source !== 'soundcloud') {
           if (Date.now() - lastSeekTime > 1000) {
             set({ currentTime: globalAudio.currentTime });
           }
@@ -62,19 +63,19 @@ export const useAudioStore = create((set, get) => ({
       });
 
       globalAudio.addEventListener('durationchange', () => {
-        if (get().currentTrack?.source !== 'youtube') {
+        if (get().currentTrack?.source !== 'youtube' && get().currentTrack?.source !== 'soundcloud') {
           set({ duration: globalAudio.duration || get().currentTrack?.duration || 0 });
         }
       });
 
       globalAudio.addEventListener('progress', () => {
-        if (get().currentTrack?.source !== 'youtube' && globalAudio.buffered.length > 0) {
+        if (get().currentTrack?.source !== 'youtube' && get().currentTrack?.source !== 'soundcloud' && globalAudio.buffered.length > 0) {
           set({ bufferedTime: globalAudio.buffered.end(globalAudio.buffered.length - 1) });
         }
       });
 
       globalAudio.addEventListener('ended', () => {
-        if (get().currentTrack?.source !== 'youtube') {
+        if (get().currentTrack?.source !== 'youtube' && get().currentTrack?.source !== 'soundcloud') {
           const { repeatMode, nextTrack } = get();
           if (repeatMode === 'one') {
             globalAudio.currentTime = 0;
@@ -86,17 +87,21 @@ export const useAudioStore = create((set, get) => ({
       });
 
       globalAudio.addEventListener('play', () => {
-        if (get().currentTrack?.source !== 'youtube') set({ isPlaying: true });
+        if (get().currentTrack?.source !== 'youtube' && get().currentTrack?.source !== 'soundcloud') {
+          set({ isPlaying: true });
+        }
       });
 
       globalAudio.addEventListener('pause', () => {
-        if (get().currentTrack?.source !== 'youtube') set({ isPlaying: false });
+        if (get().currentTrack?.source !== 'youtube' && get().currentTrack?.source !== 'soundcloud') {
+          set({ isPlaying: false });
+        }
       });
 
       globalAudio.addEventListener('error', (e) => {
         console.warn('HTML5 Audio error, attempting YouTube fallback:', e);
         const { currentTrack } = get();
-        if (currentTrack && currentTrack.source !== 'youtube') {
+        if (currentTrack && currentTrack.source !== 'youtube' && currentTrack.source !== 'soundcloud') {
           get().fallbackToYouTube(currentTrack);
         }
       });
@@ -174,13 +179,55 @@ export const useAudioStore = create((set, get) => ({
       window.onYouTubeIframeAPIReady = initYT;
     }
 
-    // 3. Start high-precision polling timer for YouTube progress
+    // 3. Initialize SoundCloud Widget API
+    const initSC = () => {
+      const scEl = document.getElementById('vanhsound-sc-player');
+      if (scEl && window.SC && window.SC.Widget && !globalSCWidget) {
+        try {
+          globalSCWidget = window.SC.Widget(scEl);
+          globalSCWidget.bind(window.SC.Widget.Events.READY, () => {
+            globalSCWidget.setVolume(get().volume * 100);
+          });
+          globalSCWidget.bind(window.SC.Widget.Events.PLAY, () => {
+            if (get().currentTrack?.source === 'soundcloud') set({ isPlaying: true });
+          });
+          globalSCWidget.bind(window.SC.Widget.Events.PAUSE, () => {
+            if (get().currentTrack?.source === 'soundcloud') set({ isPlaying: false });
+          });
+          globalSCWidget.bind(window.SC.Widget.Events.FINISH, () => {
+            if (get().currentTrack?.source === 'soundcloud') {
+              const { repeatMode, nextTrack } = get();
+              if (repeatMode === 'one') {
+                globalSCWidget.seekTo(0);
+                globalSCWidget.play();
+              } else {
+                nextTrack();
+              }
+            }
+          });
+          globalSCWidget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (data) => {
+            if (get().currentTrack?.source === 'soundcloud') {
+              if (Date.now() - lastSeekTime > 1200) {
+                set({
+                  currentTime: (data.currentPosition || 0) / 1000,
+                  duration: data.relativePosition > 0 ? ((data.currentPosition || 0) / 1000) / data.relativePosition : get().duration,
+                });
+              }
+            }
+          });
+        } catch (err) {
+          console.warn('SoundCloud Widget init error:', err);
+        }
+      }
+    };
+    initSC();
+
+    // 4. Start high-precision polling timer for YouTube progress
     if (!ytPollInterval) {
       ytPollInterval = setInterval(() => {
         const { currentTrack, isPlaying } = get();
         if (currentTrack?.source === 'youtube' && globalYTPlayer && isPlaying) {
           try {
-            // Ignore polling if user just manually seeked within last 1500ms
             if (Date.now() - lastSeekTime < 1500) return;
 
             if (typeof globalYTPlayer.getCurrentTime === 'function') {
@@ -201,7 +248,7 @@ export const useAudioStore = create((set, get) => ({
       }, 250);
     }
 
-    // 4. Keyboard Shortcuts Setup
+    // 5. Keyboard Shortcuts Setup
     if (!window._vanhKeyListenersAdded) {
       window._vanhKeyListenersAdded = true;
       window.addEventListener('keydown', (e) => {
@@ -246,7 +293,6 @@ export const useAudioStore = create((set, get) => ({
   // Auto-retry with embeddable Topic/Audio version when Error 150/101 happens
   retryWithAlternateStream: async (track, excludeId = '') => {
     if (!track || track._retried) {
-      console.warn('Track already retried, moving to next:', track.title);
       get().nextTrack();
       return;
     }
@@ -329,7 +375,6 @@ export const useAudioStore = create((set, get) => ({
       const recs = res.data.tracks || [];
       if (recs.length > 0) {
         set((state) => {
-          // Append recommended tracks avoiding duplicates
           const existingIds = new Set(state.queue.map(t => t.id));
           const newUniqueRecs = recs.filter(t => !existingIds.has(t.id));
 
@@ -346,7 +391,7 @@ export const useAudioStore = create((set, get) => ({
     }
   },
 
-  // Play a specific track
+  // Play a specific track (Handles HTML5, Audius, YouTube & SoundCloud)
   playTrack: (track, newQueue = null) => {
     if (!track) return;
     get().initAudio();
@@ -364,6 +409,7 @@ export const useAudioStore = create((set, get) => ({
     }
 
     const isYT = track.source === 'youtube' || !!track.youtube_id || String(track.id).startsWith('yt_');
+    const isSC = track.source === 'soundcloud' || String(track.id).startsWith('sc_') || (track.audio_url && track.audio_url.includes('soundcloud.com'));
     const ytVideoId = track.youtube_id || (isYT ? String(track.id).replace('yt_', '') : null);
 
     set({
@@ -377,23 +423,46 @@ export const useAudioStore = create((set, get) => ({
       isRightPanelOpen: true,
     });
 
-    if (isYT && ytVideoId) {
+    if (isSC) {
+      // 1. Play via SoundCloud Engine
       if (globalAudio) globalAudio.pause();
+      if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') globalYTPlayer.pauseVideo();
+
+      const scUrl = track.soundcloud_url || track.audio_url;
+      const playSCWidget = () => {
+        if (globalSCWidget && typeof globalSCWidget.load === 'function') {
+          globalSCWidget.load(scUrl, {
+            auto_play: true,
+            callback: () => {
+              globalSCWidget.setVolume(get().volume * 100);
+              globalSCWidget.play();
+            }
+          });
+        } else {
+          setTimeout(playSCWidget, 250);
+        }
+      };
+      playSCWidget();
+    } else if (isYT && ytVideoId) {
+      // 2. Play via YouTube Engine
+      if (globalAudio) globalAudio.pause();
+      if (globalSCWidget && typeof globalSCWidget.pause === 'function') globalSCWidget.pause();
 
       const playYTVideo = () => {
         if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
           globalYTPlayer.loadVideoById(ytVideoId);
+          globalYTPlayer.unMute();
+          globalYTPlayer.setVolume(get().volume * 100);
           globalYTPlayer.playVideo();
         } else {
           setTimeout(playYTVideo, 300);
         }
       };
-
       playYTVideo();
     } else {
-      if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
-        globalYTPlayer.pauseVideo();
-      }
+      // 3. Play via HTML5 Engine (Audius / Local Upload / MP3)
+      if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') globalYTPlayer.pauseVideo();
+      if (globalSCWidget && typeof globalSCWidget.pause === 'function') globalSCWidget.pause();
 
       if (globalAudio && track.audio_url) {
         globalAudio.src = track.audio_url;
@@ -424,10 +493,10 @@ export const useAudioStore = create((set, get) => ({
       navigator.mediaSession.setActionHandler('seekto', (details) => get().seek(details.seekTime || 0));
     }
 
-    // Automatically trigger background smart recommendations to populate upcoming queue!
+    // Automatically trigger recommendations
     get().fetchRecommendations(track);
 
-    // Automatically fetch real synchronized LRC lyrics if not yet fetched
+    // Automatically fetch real synchronized LRC lyrics
     if (!track.lyrics_lrc || track.lyrics_lrc.includes('Đang phát:') || track.lyrics_lrc.includes('Thưởng thức')) {
       axios.get('/api/lyrics', {
         params: {
@@ -452,7 +521,7 @@ export const useAudioStore = create((set, get) => ({
       }).catch(() => {});
     }
 
-    if (track.id) {
+    if (track.id && typeof track.id === 'number') {
       axios.post(`/api/tracks/${track.id}/play`).catch(() => {});
     }
   },
@@ -469,7 +538,9 @@ export const useAudioStore = create((set, get) => ({
 
   pause: () => {
     const { currentTrack } = get();
-    if (currentTrack?.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
+    if (currentTrack?.source === 'soundcloud' && globalSCWidget && typeof globalSCWidget.pause === 'function') {
+      globalSCWidget.pause();
+    } else if (currentTrack?.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
       globalYTPlayer.pauseVideo();
     } else if (globalAudio) {
       globalAudio.pause();
@@ -481,7 +552,9 @@ export const useAudioStore = create((set, get) => ({
     const { currentTrack } = get();
     if (!currentTrack) return;
 
-    if (currentTrack.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.playVideo === 'function') {
+    if (currentTrack.source === 'soundcloud' && globalSCWidget && typeof globalSCWidget.play === 'function') {
+      globalSCWidget.play();
+    } else if (currentTrack.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.playVideo === 'function') {
       globalYTPlayer.playVideo();
     } else if (globalAudio) {
       globalAudio.play().catch(() => {});
@@ -496,7 +569,10 @@ export const useAudioStore = create((set, get) => ({
 
     set({ currentTime: safeTime, isPlaying: true });
 
-    if (currentTrack?.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.seekTo === 'function') {
+    if (currentTrack?.source === 'soundcloud' && globalSCWidget && typeof globalSCWidget.seekTo === 'function') {
+      globalSCWidget.seekTo(safeTime * 1000);
+      globalSCWidget.play();
+    } else if (currentTrack?.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.seekTo === 'function') {
       globalYTPlayer.seekTo(safeTime, true);
       globalYTPlayer.playVideo();
     } else if (globalAudio) {
@@ -517,6 +593,9 @@ export const useAudioStore = create((set, get) => ({
     if (globalAudio) globalAudio.volume = safeVol;
     if (globalYTPlayer && typeof globalYTPlayer.setVolume === 'function') {
       globalYTPlayer.setVolume(safeVol * 100);
+    }
+    if (globalSCWidget && typeof globalSCWidget.setVolume === 'function') {
+      globalSCWidget.setVolume(safeVol * 100);
     }
   },
 

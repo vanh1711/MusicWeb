@@ -40,7 +40,25 @@ export default function AppLayout() {
           width: 2, 
           height: 2, 
           opacity: 0.001, 
-          pointerEvents: 'none',
+          pointerEvents: 'none', 
+          zIndex: 1 
+        }} 
+      />
+
+      {/* SoundCloud IFrame Audio Engine */}
+      <iframe 
+        id="vanhsound-sc-player"
+        title="SoundCloud Player Engine"
+        allow="autoplay"
+        src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/293&auto_play=false"
+        style={{ 
+          position: 'fixed', 
+          bottom: 2, 
+          left: 2, 
+          width: 2, 
+          height: 2, 
+          opacity: 0.001, 
+          pointerEvents: 'none', 
           zIndex: 1 
         }} 
       />

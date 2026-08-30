@@ -96,9 +96,27 @@ class MusicController extends Controller
             ]);
         }
 
+    /**
+     * Resolve SoundCloud Track by URL
+     */
+    public function resolveSoundCloud(Request $request)
+    {
+        $url = $request->get('url', '');
+        if (empty($url) || !str_contains($url, 'soundcloud.com')) {
+            return response()->json(['success' => false, 'message' => 'Invalid SoundCloud URL'], 422);
+        }
+
+        $track = $this->liveMusic->resolveSoundCloudTrack($url);
+        if ($track) {
+            return response()->json([
+                'success' => true,
+                'track' => $track,
+            ]);
+        }
+
         return response()->json([
             'success' => false,
-            'message' => 'No alternate stream found',
+            'message' => 'Could not resolve SoundCloud track',
         ], 404);
     }
 
