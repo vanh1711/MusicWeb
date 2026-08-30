@@ -4,6 +4,7 @@ import axios from 'axios';
 let globalAudio = null;
 let globalYTPlayer = null;
 let ytPollInterval = null;
+let lastSeekTime = 0;
 
 if (typeof window !== 'undefined') {
   globalAudio = new Audio();
@@ -28,12 +29,20 @@ export const useAudioStore = create((set, get) => ({
   repeatMode: 'off', // 'off' | 'all' | 'one'
   isLoadingRecommendations: false,
 
-  // UI Panels State
+  // UI Panels State (Spotify 3-Column Layout)
+  isRightPanelOpen: true, // Right Now Playing Panel
+  rightPanelTab: 'now_playing', // 'now_playing' | 'queue' | 'lyrics'
   isLyricsOpen: false,
   isFullScreenLyricsOpen: false,
   isQueueOpen: false,
   isFullscreen: false,
   likedTrackIds: new Set([1, 4, 6]),
+
+  toggleRightPanel: (force) => set((state) => ({
+    isRightPanelOpen: typeof force === 'boolean' ? force : !state.isRightPanelOpen
+  })),
+
+  setRightPanelTab: (tab) => set({ rightPanelTab: tab, isRightPanelOpen: true }),
 
   // Init Audio & YouTube Listeners
   initAudio: () => {
@@ -46,7 +55,10 @@ export const useAudioStore = create((set, get) => ({
 
       globalAudio.addEventListener('timeupdate', () => {
         if (get().currentTrack?.source !== 'youtube') {
-          set({ currentTime: globalAudio.currentTime });
+          // Avoid overwriting if user just seeked within 800ms
+          if (Date.now() - lastSeekTime > 800) {
+            set({ currentTime: globalAudio.currentTime });
+          }
         }
       });
 
@@ -83,16 +95,19 @@ export const useAudioStore = create((set, get) => ({
       });
 
       globalAudio.addEventListener('error', (e) => {
-        console.warn('HTML5 Audio notice:', e);
-        // If error, try next track
-        if (get().isPlaying) {
-          setTimeout(() => get().nextTrack(), 1000);
+        console.warn('HTML5 Audio error, attempting YouTube fallback:', e);
+        const { currentTrack } = get();
+        if (currentTrack && currentTrack.source !== 'youtube') {
+          get().fallbackToYouTube(currentTrack);
         }
       });
     }
 
-    // 2. Initialize YouTube IFrame Audio API player (hidden)
+    // 2. Initialize YouTube IFrame Audio API player
     const initYT = () => {
+      const el = document.getElementById('vanhsound-yt-player');
+      if (!el) return;
+
       if (window.YT && window.YT.Player && !globalYTPlayer) {
         try {
           globalYTPlayer = new window.YT.Player('vanhsound-yt-player', {
@@ -110,11 +125,19 @@ export const useAudioStore = create((set, get) => ({
             events: {
               onReady: (event) => {
                 event.target.setVolume(get().volume * 100);
+                const { currentTrack, isPlaying } = get();
+                if (currentTrack?.source === 'youtube' && isPlaying) {
+                  const ytid = currentTrack.youtube_id || String(currentTrack.id).replace('yt_', '');
+                  event.target.loadVideoById(ytid);
+                  event.target.playVideo();
+                }
               },
               onStateChange: (event) => {
-                if (get().currentTrack?.source === 'youtube') {
+                const { currentTrack } = get();
+                if (currentTrack?.source === 'youtube') {
                   if (event.data === window.YT.PlayerState.PLAYING) {
-                    set({ isPlaying: true, duration: globalYTPlayer.getDuration() || get().currentTrack?.duration || 0 });
+                    const dur = globalYTPlayer.getDuration() || currentTrack.duration || 0;
+                    set({ isPlaying: true, duration: dur });
                   } else if (event.data === window.YT.PlayerState.PAUSED) {
                     set({ isPlaying: false });
                   } else if (event.data === window.YT.PlayerState.ENDED) {
@@ -130,8 +153,7 @@ export const useAudioStore = create((set, get) => ({
               },
               onError: (event) => {
                 console.warn('YouTube playback error code:', event.data);
-                // Auto skip on unplayable video
-                setTimeout(() => get().nextTrack(), 800);
+                setTimeout(() => get().nextTrack(), 1000);
               },
             },
           });
@@ -153,6 +175,9 @@ export const useAudioStore = create((set, get) => ({
         const { currentTrack, isPlaying } = get();
         if (currentTrack?.source === 'youtube' && globalYTPlayer && isPlaying) {
           try {
+            // Ignore polling if user just manually seeked within last 1200ms
+            if (Date.now() - lastSeekTime < 1200) return;
+
             if (typeof globalYTPlayer.getCurrentTime === 'function') {
               const cur = globalYTPlayer.getCurrentTime() || 0;
               const dur = globalYTPlayer.getDuration() || currentTrack.duration || 0;
@@ -195,7 +220,7 @@ export const useAudioStore = create((set, get) => ({
         } else if (e.key.toLowerCase() === 'm') {
           get().toggleMute();
         } else if (e.key.toLowerCase() === 'l') {
-          get().toggleLyrics();
+          get().toggleFullScreenLyrics();
         } else if (e.key.toLowerCase() === 'q') {
           get().toggleQueue();
         } else if (e.key.toLowerCase() === 'f') {
@@ -211,6 +236,28 @@ export const useAudioStore = create((set, get) => ({
         set({ likedTrackIds: ids });
       }
     }).catch(() => {});
+  },
+
+  // Fallback to YouTube if direct audio stream fails
+  fallbackToYouTube: async (track) => {
+    try {
+      const res = await axios.get('/api/search', {
+        params: { q: `${track.title} ${track.artist?.name || ''}` }
+      });
+      if (res.data && res.data.tracks && res.data.tracks.length > 0) {
+        const ytTrack = res.data.tracks.find(t => t.source === 'youtube') || res.data.tracks[0];
+        if (ytTrack && ytTrack.youtube_id) {
+          get().playTrack({
+            ...track,
+            source: 'youtube',
+            youtube_id: ytTrack.youtube_id,
+            id: ytTrack.id || `yt_${ytTrack.youtube_id}`,
+          }, get().queue);
+        }
+      }
+    } catch (err) {
+      console.warn('Fallback search error:', err);
+    }
   },
 
   // Fetch smart recommendations and append to queue
@@ -257,17 +304,15 @@ export const useAudioStore = create((set, get) => ({
     let queueIndex = 0;
 
     if (newQueue && Array.isArray(newQueue) && newQueue.length > 1) {
-      // User clicked a track from an explicit list/playlist
       queue = [...newQueue];
       const idx = queue.findIndex(t => t.id === track.id);
       queueIndex = idx !== -1 ? idx : 0;
     } else {
-      // User played a single track (from search, quick pick, etc.)
       queue = [track];
       queueIndex = 0;
     }
 
-    const isYT = track.source === 'youtube' || !!track.youtube_id;
+    const isYT = track.source === 'youtube' || !!track.youtube_id || String(track.id).startsWith('yt_');
     const ytVideoId = track.youtube_id || (isYT ? String(track.id).replace('yt_', '') : null);
 
     set({
@@ -278,22 +323,22 @@ export const useAudioStore = create((set, get) => ({
       currentTime: 0,
       duration: track.duration || 0,
       bufferedTime: 0,
+      isRightPanelOpen: true, // Auto open right side now-playing panel on song start
     });
 
     if (isYT && ytVideoId) {
       if (globalAudio) globalAudio.pause();
 
-      if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
-        globalYTPlayer.loadVideoById(ytVideoId);
-        globalYTPlayer.playVideo();
-      } else {
-        setTimeout(() => {
-          if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
-            globalYTPlayer.loadVideoById(ytVideoId);
-            globalYTPlayer.playVideo();
-          }
-        }, 500);
-      }
+      const playYTVideo = () => {
+        if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
+          globalYTPlayer.loadVideoById(ytVideoId);
+          globalYTPlayer.playVideo();
+        } else {
+          setTimeout(playYTVideo, 300);
+        }
+      };
+
+      playYTVideo();
     } else {
       if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
         globalYTPlayer.pauseVideo();
@@ -302,8 +347,12 @@ export const useAudioStore = create((set, get) => ({
       if (globalAudio && track.audio_url) {
         globalAudio.src = track.audio_url;
         globalAudio.play().catch(err => {
-          console.warn('HTML5 Auto-play notice:', err);
+          console.warn('HTML5 Auto-play notice, trying YouTube:', err);
+          get().fallbackToYouTube(track);
         });
+      } else {
+        // If no direct audio url, search YouTube
+        get().fallbackToYouTube(track);
       }
     }
 
@@ -392,12 +441,19 @@ export const useAudioStore = create((set, get) => ({
 
   seek: (newTime) => {
     const { currentTrack } = get();
-    set({ currentTime: newTime });
+    lastSeekTime = Date.now();
+    const safeTime = Math.max(0, Math.min(get().duration || 300, newTime));
+
+    set({ currentTime: safeTime });
 
     if (currentTrack?.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.seekTo === 'function') {
-      globalYTPlayer.seekTo(newTime, true);
+      globalYTPlayer.seekTo(safeTime, true);
     } else if (globalAudio) {
-      globalAudio.currentTime = newTime;
+      try {
+        globalAudio.currentTime = safeTime;
+      } catch (err) {
+        console.warn('HTML5 seek error:', err);
+      }
     }
   },
 
@@ -413,70 +469,39 @@ export const useAudioStore = create((set, get) => ({
   },
 
   toggleMute: () => {
-    const { isMuted, volume } = get();
-    const newMuted = !isMuted;
-    set({ isMuted: newMuted });
-
-    if (globalAudio) globalAudio.muted = newMuted;
-    if (globalYTPlayer) {
-      if (newMuted) {
-        if (typeof globalYTPlayer.mute === 'function') globalYTPlayer.mute();
-      } else {
-        if (typeof globalYTPlayer.unMute === 'function') globalYTPlayer.unMute();
-      }
+    const { isMuted, volume, setVolume } = get();
+    if (isMuted) {
+      setVolume(volume > 0 ? volume : 0.75);
+    } else {
+      setVolume(0);
     }
   },
 
+  addToQueue: (track) => {
+    if (!track) return;
+    set((state) => ({
+      queue: [...state.queue, track],
+    }));
+  },
+
   nextTrack: () => {
-    const { queue, queueIndex, isShuffled, playTrack, currentTrack } = get();
+    const { queue, queueIndex, repeatMode, currentTrack, isShuffled } = get();
     if (queue.length === 0) return;
 
     let nextIdx = queueIndex + 1;
+
     if (isShuffled) {
       nextIdx = Math.floor(Math.random() * queue.length);
     }
 
     if (nextIdx < queue.length) {
-      // Move to the next queued/recommended song!
       const nextSong = queue[nextIdx];
-      
-      // Update queue index and play
+      get().playTrack(nextSong, queue);
       set({ queueIndex: nextIdx });
-      
-      // Play through same queue without wiping it
-      const isYT = nextSong.source === 'youtube' || !!nextSong.youtube_id;
-      const ytVideoId = nextSong.youtube_id || (isYT ? String(nextSong.id).replace('yt_', '') : null);
-
-      set({
-        currentTrack: nextSong,
-        isPlaying: true,
-        currentTime: 0,
-        duration: nextSong.duration || 0,
-        bufferedTime: 0,
-      });
-
-      if (isYT && ytVideoId) {
-        if (globalAudio) globalAudio.pause();
-        if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
-          globalYTPlayer.loadVideoById(ytVideoId);
-          globalYTPlayer.playVideo();
-        }
-      } else {
-        if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
-          globalYTPlayer.pauseVideo();
-        }
-        if (globalAudio && nextSong.audio_url) {
-          globalAudio.src = nextSong.audio_url;
-          globalAudio.play().catch(() => {});
-        }
-      }
-
-      // If near end of queue, fetch more recommendations
-      if (nextIdx >= queue.length - 2) {
-        get().fetchRecommendations(nextSong);
-      }
-    } else {
-      // Reached end, loop or fetch fresh recommendations
+    } else if (repeatMode === 'all') {
+      get().playTrack(queue[0], queue);
+      set({ queueIndex: 0 });
+    } else if (currentTrack) {
       get().fetchRecommendations(currentTrack);
       set({ queueIndex: 0 });
     }
@@ -496,34 +521,8 @@ export const useAudioStore = create((set, get) => ({
     }
 
     const prevSong = queue[prevIdx];
+    playTrack(prevSong, queue);
     set({ queueIndex: prevIdx });
-
-    const isYT = prevSong.source === 'youtube' || !!prevSong.youtube_id;
-    const ytVideoId = prevSong.youtube_id || (isYT ? String(prevSong.id).replace('yt_', '') : null);
-
-    set({
-      currentTrack: prevSong,
-      isPlaying: true,
-      currentTime: 0,
-      duration: prevSong.duration || 0,
-      bufferedTime: 0,
-    });
-
-    if (isYT && ytVideoId) {
-      if (globalAudio) globalAudio.pause();
-      if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
-        globalYTPlayer.loadVideoById(ytVideoId);
-        globalYTPlayer.playVideo();
-      }
-    } else {
-      if (globalYTPlayer && typeof globalYTPlayer.pauseVideo === 'function') {
-        globalYTPlayer.pauseVideo();
-      }
-      if (globalAudio && prevSong.audio_url) {
-        globalAudio.src = prevSong.audio_url;
-        globalAudio.play().catch(() => {});
-      }
-    }
   },
 
   toggleShuffle: () => {

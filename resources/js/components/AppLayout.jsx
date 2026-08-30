@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import PlayerBar from './PlayerBar';
+import NowPlayingPanel from './NowPlayingPanel';
 import LyricsDrawer from './LyricsDrawer';
 import QueueDrawer from './QueueDrawer';
 import FullScreenPlayer from './FullScreenPlayer';
@@ -59,7 +60,7 @@ export default function AppLayout() {
       <div className="absolute top-1/3 -right-20 w-[450px] h-[450px] rounded-full bg-[#EC4899]/08 filter blur-[120px] pointer-events-none animate-blob-pulse z-0" />
       <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none z-0" />
 
-      {/* Main Workspace */}
+      {/* Main Workspace (Spotify 3-Column Layout: Left Sidebar + Center Content + Right Now Playing) */}
       <div className="relative z-10 flex flex-1 min-h-0 overflow-hidden">
         {/* Left Navigation Sidebar */}
         <Sidebar
@@ -77,7 +78,10 @@ export default function AppLayout() {
           </main>
         </div>
 
-        {/* Right Drawers */}
+        {/* Right Now Playing Panel (Matches Screenshot 1 & 2) */}
+        <NowPlayingPanel />
+
+        {/* Floating Drawers */}
         <LyricsDrawer />
         <QueueDrawer />
       </div>

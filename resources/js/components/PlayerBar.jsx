@@ -14,7 +14,9 @@ import {
   Maximize2, 
   Mic2, 
   ListMusic,
-  Plus
+  Plus,
+  PanelRight,
+  Tv2
 } from 'lucide-react';
 import { useAudioStore } from '../store/useAudioStore';
 import { Link } from 'react-router-dom';
@@ -31,6 +33,7 @@ export default function PlayerBar() {
     isMuted,
     isShuffled,
     repeatMode,
+    isRightPanelOpen,
     isLyricsOpen,
     isFullScreenLyricsOpen,
     isQueueOpen,
@@ -44,6 +47,7 @@ export default function PlayerBar() {
     toggleMute,
     toggleShuffle,
     toggleRepeat,
+    toggleRightPanel,
     toggleLyrics,
     toggleFullScreenLyrics,
     toggleQueue,
@@ -86,12 +90,12 @@ export default function PlayerBar() {
   return (
     <>
       <footer className="h-22 bg-[#08080a]/95 backdrop-blur-2xl border-t border-white/[0.08] px-5 flex items-center justify-between select-none relative z-40 shadow-2xl">
-        {/* 1. Left: Track Info & Quick Actions */}
+        {/* 1. Left: Track Info & Quick Actions (Clicking opens Right Big Cover View) */}
         <div className="flex items-center gap-3.5 w-1/4 min-w-[220px]">
           <div 
-            onClick={toggleQueue}
+            onClick={() => toggleRightPanel()}
             className="relative group flex-shrink-0 cursor-pointer"
-            title="Xem danh sách bài hát kế tiếp & gợi ý"
+            title="Nhấn để mở màn hình bài hát đang phát bên phải"
           >
             <img
               src={currentTrack.cover_url || currentTrack.display_cover_url}
@@ -109,8 +113,12 @@ export default function PlayerBar() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="overflow-hidden" onClick={toggleQueue} title="Xem danh sách bài hát kế tiếp & gợi ý">
-              <h4 className="text-sm font-semibold text-white hover:text-[#5E6AD2] cursor-pointer transition-colors truncate">
+            <div 
+              className="overflow-hidden cursor-pointer" 
+              onClick={() => toggleRightPanel()} 
+              title="Nhấn để mở màn hình bài hát đang phát bên phải"
+            >
+              <h4 className="text-sm font-semibold text-white hover:text-[#5E6AD2] transition-colors truncate">
                 {currentTrack.title}
               </h4>
             </div>
@@ -134,11 +142,11 @@ export default function PlayerBar() {
             <button
               onClick={() => toggleLike(currentTrack.id)}
               className={`p-1.5 rounded-full hover:bg-white/[0.06] transition-colors ${
-                isLiked ? 'text-[#EC4899]' : 'text-[#8A8F98] hover:text-white'
+                isLiked ? 'text-[#10B981]' : 'text-[#8A8F98] hover:text-white'
               }`}
               title={isLiked ? 'Bỏ thích' : 'Yêu thích'}
             >
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-[#EC4899]' : ''}`} />
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-[#10B981]' : ''}`} />
             </button>
           </div>
         </div>
@@ -247,9 +255,22 @@ export default function PlayerBar() {
           </div>
         </div>
 
-        {/* 3. Right: Lyrics, Queue, Volume & Fullscreen */}
-        <div className="flex items-center justify-end gap-2.5 w-1/4 min-w-[220px]">
-          {/* Synchronized Karaoke Lyrics Button (Image 2 style) */}
+        {/* 3. Right: Now Playing View, Karaoke, Queue, Volume & Fullscreen */}
+        <div className="flex items-center justify-end gap-2 w-1/4 min-w-[220px]">
+          {/* Now Playing Panel Toggle (Screenshot 1 & 2 view) */}
+          <button
+            onClick={() => toggleRightPanel()}
+            className={`p-2 rounded-xl transition-all ${
+              isRightPanelOpen
+                ? 'bg-white/[0.12] text-white border border-white/20'
+                : 'text-[#8A8F98] hover:text-white hover:bg-white/[0.06]'
+            }`}
+            title="Màn hình bài hát đang phát bên phải (Now Playing View)"
+          >
+            <PanelRight className="w-4 h-4" />
+          </button>
+
+          {/* Synchronized Karaoke Lyrics Button */}
           <button
             onClick={() => toggleFullScreenLyrics()}
             className={`p-2 rounded-xl transition-all ${
@@ -276,7 +297,7 @@ export default function PlayerBar() {
           </button>
 
           {/* Volume Controls */}
-          <div className="flex items-center gap-2 group/vol pl-1">
+          <div className="flex items-center gap-1.5 group/vol pl-1">
             <button
               onClick={toggleMute}
               className="text-[#8A8F98] hover:text-white p-1"
@@ -298,14 +319,14 @@ export default function PlayerBar() {
               step="0.01"
               value={isMuted ? 0 : volume}
               onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="w-18 sm:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[#5E6AD2]"
+              className="w-16 sm:w-20 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[#5E6AD2]"
             />
           </div>
 
           {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className="text-[#8A8F98] hover:text-white p-2 rounded-xl hover:bg-white/[0.06] transition-colors"
+            className="text-[#8A8F98] hover:text-white p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors"
             title="Toàn màn hình (F)"
           >
             <Maximize2 className="w-4 h-4" />
