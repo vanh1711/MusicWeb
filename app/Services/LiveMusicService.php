@@ -217,6 +217,23 @@ class LiveMusicService
             // Parse YouTube results
             $ytTracks = $this->parseYouTubeiResults($ytContent);
 
+            // Sort: Prioritize embeddable Audio / Topic / Lyric / Remix versions over restrictive MVs
+            usort($ytTracks, function ($a, $b) {
+                $aTitle = mb_strtolower($a['title']);
+                $bTitle = mb_strtolower($b['title']);
+
+                $aScore = 0;
+                $bScore = 0;
+
+                if (str_contains($aTitle, 'audio') || str_contains($aTitle, 'topic') || str_contains($aTitle, 'lyric') || str_contains($aTitle, 'remix')) $aScore += 2;
+                if (str_contains($bTitle, 'audio') || str_contains($bTitle, 'topic') || str_contains($bTitle, 'lyric') || str_contains($bTitle, 'remix')) $bScore += 2;
+
+                if (str_contains($aTitle, 'official music video') || str_contains($aTitle, '(m/v)')) $aScore -= 1;
+                if (str_contains($bTitle, 'official music video') || str_contains($bTitle, '(m/v)')) $bScore -= 1;
+
+                return $bScore <=> $aScore;
+            });
+
             // Parse Audius results
             $audiusTracks = [];
             if ($audiusContent) {
