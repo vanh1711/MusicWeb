@@ -55,16 +55,16 @@ class VietnameseMusicSeeder extends Seeder
             'cover_url' => 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80',
         ]);
 
-        // 2. Fetch real official tracks from Apple Music / iTunes API for top Vietnamese artists
+        // 2. Official authentic artwork & real profiles for top Vietnamese artists
         $artistDefinitions = [
             [
                 'name' => 'Sơn Tùng M-TP',
                 'slug' => 'son-tung-m-tp',
                 'genre_id' => $vpop->id,
                 'bio' => 'Nghệ sĩ biểu tượng của V-Pop hiện đại, sáng lập M-TP Entertainment với hàng loạt kỷ lục âm nhạc kỷ nguyên số.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 12890400,
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e3/0b/38/e30b383e-5818-321a-7626-557b7b0f8ba3/24UMGIM61359.rgb.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e3/0b/38/e30b383e-5818-321a-7626-557b7b0f8ba3/24UMGIM61359.rgb.jpg/600x600bb.jpg',
+                'monthly_listeners' => 14890400,
                 'is_verified' => true,
                 'search_query' => 'Sơn Tùng M-TP',
             ],
@@ -73,9 +73,9 @@ class VietnameseMusicSeeder extends Seeder
                 'slug' => 'den-vau',
                 'genre_id' => $rapviet->id,
                 'bio' => 'Rapper truyền cảm hứng hàng đầu Việt Nam với những ca từ mộc mạc, triết lý sống gần gũi và sâu sắc.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 9450200,
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/06/3e/9a/063e9a8f-1383-c601-efda-347e7d02ba66/cover.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/06/3e/9a/063e9a8f-1383-c601-efda-347e7d02ba66/cover.jpg/600x600bb.jpg',
+                'monthly_listeners' => 10450200,
                 'is_verified' => true,
                 'search_query' => 'Đen Vâu',
             ],
@@ -84,9 +84,9 @@ class VietnameseMusicSeeder extends Seeder
                 'slug' => 'hieuthuhai',
                 'genre_id' => $rapviet->id,
                 'bio' => 'Thành viên GERDNANG, hiện tượng Rap Việt thế hệ mới với phong cách thời thượng, flow cuốn hút.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 8720100,
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/57/17/67/571767f9-c14c-9765-96a2-73586df71b73/602438561919_Cover.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/57/17/67/571767f9-c14c-9765-96a2-73586df71b73/602438561919_Cover.jpg/600x600bb.jpg',
+                'monthly_listeners' => 9720100,
                 'is_verified' => true,
                 'search_query' => 'HIEUTHUHAI',
             ],
@@ -95,9 +95,9 @@ class VietnameseMusicSeeder extends Seeder
                 'slug' => 'vu',
                 'genre_id' => $indieviet->id,
                 'bio' => '"Hoàng tử Indie Việt" với chất giọng trầm ấm, những bản tình ca da diết đi sâu vào tâm hồn người nghe.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 6410300,
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/21/40/f8/2140f8b1-e47b-f1cc-ba6b-c97dbb9878bb/5054197340369.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/21/40/f8/2140f8b1-e47b-f1cc-ba6b-c97dbb9878bb/5054197340369.jpg/600x600bb.jpg',
+                'monthly_listeners' => 7410300,
                 'is_verified' => true,
                 'search_query' => 'Vũ.',
             ],
@@ -106,9 +106,9 @@ class VietnameseMusicSeeder extends Seeder
                 'slug' => 'chillies',
                 'genre_id' => $indieviet->id,
                 'bio' => 'Ban nhạc Pop Rock / Indie tài năng với các bản hit bùng nổ cảm xúc như Mascara, Vùng Ký Ức, Giấc Mơ Khác.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 5890200,
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/e6/3d/ee/e63deea0-079a-c9d5-a2cc-93fab07b8752/190296722745.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/e6/3d/ee/e63deea0-079a-c9d5-a2cc-93fab07b8752/190296722745.jpg/600x600bb.jpg',
+                'monthly_listeners' => 6890200,
                 'is_verified' => true,
                 'search_query' => 'Chillies',
             ],
@@ -117,33 +117,55 @@ class VietnameseMusicSeeder extends Seeder
                 'slug' => 'mono',
                 'genre_id' => $vpop->id,
                 'bio' => 'Nghệ sĩ trẻ đột phá với album đầu tay 22 và bản hit quốc dân Waiting For You khuấy đảo làng nhạc.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 4920100,
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/db/92/be/db92be06-0d95-ecff-858f-385c247ba063/198704207853_Cover.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/db/92/be/db92be06-0d95-ecff-858f-385c247ba063/198704207853_Cover.jpg/600x600bb.jpg',
+                'monthly_listeners' => 5920100,
                 'is_verified' => true,
                 'search_query' => 'MONO',
+            ],
+            [
+                'name' => 'Tăng Duy Tân',
+                'slug' => 'tang-duy-tan',
+                'genre_id' => $vpop->id,
+                'bio' => 'Hit-maker hàng đầu V-Pop với hàng loạt bản hit đình đám Châu Á như Bên Trên Tầng Lầu, Cắt Đôi Nỗi Sầu, Bật Tình Yêu Lên.',
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/ae/63/ca/ae63ca86-defa-42ab-f179-04fb44599606/190296490101.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/ae/63/ca/ae63ca86-defa-42ab-f179-04fb44599606/190296490101.jpg/600x600bb.jpg',
+                'monthly_listeners' => 6200000,
+                'is_verified' => true,
+                'search_query' => 'Tăng Duy Tân',
+            ],
+            [
+                'name' => 'Hoàng Dũng',
+                'slug' => 'hoang-dung',
+                'genre_id' => $indieviet->id,
+                'bio' => 'Nhạc sĩ, ca sĩ nổi tiếng với chất nhạc tự sự sâu lắng qua các tác phẩm Nàng Thơ, Yếu Đuối, Đôi Lời.',
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/1e/78/0d/1e780d6a-074f-81c1-f071-fe372b3528a2/cover.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/1e/78/0d/1e780d6a-074f-81c1-f071-fe372b3528a2/cover.jpg/600x600bb.jpg',
+                'monthly_listeners' => 4500000,
+                'is_verified' => true,
+                'search_query' => 'Hoàng Dũng',
+            ],
+            [
+                'name' => 'Hòa Minzy',
+                'slug' => 'hoa-minzy',
+                'genre_id' => $vpop->id,
+                'bio' => 'Nữ ca sĩ sở hữu giọng hát nội lực bậc nhất V-Pop với các siêu phẩm Thị Mầu, Không Thể Cùng Nhau Suốt Kiếp, Bật Tình Yêu Lên.',
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/10/c4/27/10c427fb-9134-6266-9bc7-fd9b8eec4aa4/199066937518.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/10/c4/27/10c427fb-9134-6266-9bc7-fd9b8eec4aa4/199066937518.jpg/600x600bb.jpg',
+                'monthly_listeners' => 5100000,
+                'is_verified' => true,
+                'search_query' => 'Hòa Minzy',
             ],
             [
                 'name' => 'Trịnh Thăng Bình',
                 'slug' => 'trinh-thang-binh',
                 'genre_id' => $vpop->id,
-                'bio' => 'Ca sĩ, nhạc sĩ và nhà sản xuất âm nhạc tài hoa với bản hit Người Ấy, Tâm Sự Tuổi 30.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1600&q=80',
+                'bio' => 'Ca sĩ, nhạc sĩ và nhà sản xuất âm nhạc tài hoa với bản hit quốc dân Người Ấy, Tâm Sự Tuổi 30, Khác Biệt To Lớn.',
+                'avatar_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/03/c1/d0/03c1d015-2abb-60d6-56d5-707a3fba0273/3617050146441.jpg/600x600bb.jpg',
+                'banner_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/03/c1/d0/03c1d015-2abb-60d6-56d5-707a3fba0273/3617050146441.jpg/600x600bb.jpg',
                 'monthly_listeners' => 3800000,
                 'is_verified' => true,
                 'search_query' => 'Trịnh Thăng Bình',
-            ],
-            [
-                'name' => 'Hoài Lâm',
-                'slug' => 'hoai-lam',
-                'genre_id' => $indieviet->id,
-                'bio' => 'Giọng ca ballad truyền cảm sâu lắng với các ca khúc bất hủ Hoa Nở Không Màu, Buồn Làm Chi Em Ơi.',
-                'avatar_url' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
-                'banner_url' => 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1600&q=80',
-                'monthly_listeners' => 4200000,
-                'is_verified' => true,
-                'search_query' => 'Hoài Lâm',
             ],
         ];
 
@@ -237,14 +259,14 @@ class VietnameseMusicSeeder extends Seeder
             }
         }
 
-        // 3. Featured Playlists
+        // 3. Featured Playlists with Authentic Artwork
         if (!empty($allCreatedTracks)) {
             $sonTungPlaylist = Playlist::updateOrCreate(
                 ['title' => 'Tuyển Tập Sơn Tùng M-TP (Best of M-TP)'],
                 [
                     'user_id' => $admin->id,
                     'description' => 'Toàn bộ những siêu phẩm làm nên tên tuổi của Sơn Tùng M-TP trên VanhSound.',
-                    'cover_url' => 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+                    'cover_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e3/0b/38/e30b383e-5818-321a-7626-557b7b0f8ba3/24UMGIM61359.rgb.jpg/600x600bb.jpg',
                     'is_public' => true,
                     'is_featured' => true,
                 ]
@@ -265,8 +287,8 @@ class VietnameseMusicSeeder extends Seeder
                 ['title' => 'Top Hits V-Pop & Rap Việt 2026'],
                 [
                     'user_id' => $admin->id,
-                    'description' => 'Những bài hát thịnh hành nhất Việt Nam từ Sơn Tùng M-TP, Đen Vâu, HIEUTHUHAI, Vũ, Chillies, MONO.',
-                    'cover_url' => 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80',
+                    'description' => 'Những bài hát thịnh hành nhất Việt Nam từ Sơn Tùng M-TP, Đen Vâu, HIEUTHUHAI, Vũ., Chillies, MONO, Tăng Duy Tân.',
+                    'cover_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/db/92/be/db92be06-0d95-ecff-858f-385c247ba063/198704207853_Cover.jpg/600x600bb.jpg',
                     'is_public' => true,
                     'is_featured' => true,
                 ]
@@ -278,6 +300,30 @@ class VietnameseMusicSeeder extends Seeder
                 $vpopSync[$tid] = ['position' => $pos + 1];
             }
             $vpopPlaylist->tracks()->sync($vpopSync);
+
+            // Vinahouse & Remix Hot TikTok
+            $remixPlaylist = Playlist::updateOrCreate(
+                ['title' => 'Vinahouse & TikTok Remix Cực Cháy'],
+                [
+                    'user_id' => $admin->id,
+                    'description' => 'Những bản phối Remix, Vinahouse bốc lửa khuấy đảo TikTok Việt Nam.',
+                    'cover_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/ae/63/ca/ae63ca86-defa-42ab-f179-04fb44599606/190296490101.jpg/600x600bb.jpg',
+                    'is_public' => true,
+                    'is_featured' => true,
+                ]
+            );
+
+            // Indie & Acoustic Chill
+            $indiePlaylist = Playlist::updateOrCreate(
+                ['title' => 'Indie & Acoustic Việt Chill Đêm Khuya'],
+                [
+                    'user_id' => $admin->id,
+                    'description' => 'Những giai điệu acoustic mộc mạc, sâu lắng từ Vũ., Chillies, Hoàng Dũng, Thịnh Suy.',
+                    'cover_url' => 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/21/40/f8/2140f8b1-e47b-f1cc-ba6b-c97dbb9878bb/5054197340369.jpg/600x600bb.jpg',
+                    'is_public' => true,
+                    'is_featured' => true,
+                ]
+            );
         }
     }
 }
