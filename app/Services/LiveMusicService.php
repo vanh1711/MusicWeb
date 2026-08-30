@@ -20,6 +20,36 @@ class LiveMusicService
     }
 
     /**
+     * Resolve embeddable alternate stream when an official MV has embedding restricted (Error 150/101)
+     */
+    public function resolveAlternateStream(string $title, ?string $artist = null, ?string $excludeId = null): ?array
+    {
+        $cleanTitle = preg_replace('/(\(.*?\)|\(.*|\[.*?\]|official|music|video|mv|audio|remix|tik\s*tok)/iu', '', $title);
+        $query = trim($cleanTitle . ' ' . ($artist ?: '') . ' audio');
+
+        $results = $this->searchUnified($query);
+        if (!empty($results['tracks'])) {
+            foreach ($results['tracks'] as $t) {
+                if (!empty($t['youtube_id']) && $t['youtube_id'] !== $excludeId) {
+                    return $t;
+                }
+            }
+        }
+
+        // Try lyrics query
+        $lyricResults = $this->searchUnified(trim($cleanTitle . ' lyrics'));
+        if (!empty($lyricResults['tracks'])) {
+            foreach ($lyricResults['tracks'] as $t) {
+                if (!empty($t['youtube_id']) && $t['youtube_id'] !== $excludeId) {
+                    return $t;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Fetch synchronized LRC lyrics from open LRC database (LrcLib API)
      */
     public function fetchSyncedLyrics(string $title, ?string $artist = null, ?int $duration = 0): ?string

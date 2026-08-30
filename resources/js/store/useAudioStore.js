@@ -55,8 +55,7 @@ export const useAudioStore = create((set, get) => ({
 
       globalAudio.addEventListener('timeupdate', () => {
         if (get().currentTrack?.source !== 'youtube') {
-          // Avoid overwriting if user just seeked within 800ms
-          if (Date.now() - lastSeekTime > 800) {
+          if (Date.now() - lastSeekTime > 1000) {
             set({ currentTime: globalAudio.currentTime });
           }
         }
@@ -153,7 +152,11 @@ export const useAudioStore = create((set, get) => ({
               },
               onError: (event) => {
                 console.warn('YouTube playback error code:', event.data);
-                setTimeout(() => get().nextTrack(), 1000);
+                const { currentTrack } = get();
+                if (currentTrack) {
+                  const ytid = currentTrack.youtube_id || String(currentTrack.id).replace('yt_', '');
+                  get().retryWithAlternateStream(currentTrack, ytid);
+                }
               },
             },
           });
@@ -175,8 +178,8 @@ export const useAudioStore = create((set, get) => ({
         const { currentTrack, isPlaying } = get();
         if (currentTrack?.source === 'youtube' && globalYTPlayer && isPlaying) {
           try {
-            // Ignore polling if user just manually seeked within last 1200ms
-            if (Date.now() - lastSeekTime < 1200) return;
+            // Ignore polling if user just manually seeked within last 1500ms
+            if (Date.now() - lastSeekTime < 1500) return;
 
             if (typeof globalYTPlayer.getCurrentTime === 'function') {
               const cur = globalYTPlayer.getCurrentTime() || 0;
@@ -238,11 +241,57 @@ export const useAudioStore = create((set, get) => ({
     }).catch(() => {});
   },
 
+  // Auto-retry with embeddable Topic/Audio version when Error 150/101 happens
+  retryWithAlternateStream: async (track, excludeId = '') => {
+    if (!track || track._retried) {
+      console.warn('Track already retried, moving to next:', track.title);
+      get().nextTrack();
+      return;
+    }
+
+    try {
+      const res = await axios.get('/api/stream/resolve', {
+        params: {
+          title: track.title,
+          artist: track.artist?.name || '',
+          exclude_id: excludeId || '',
+        }
+      });
+
+      if (res.data && res.data.youtube_id) {
+        const altId = res.data.youtube_id;
+        const updatedTrack = {
+          ...track,
+          source: 'youtube',
+          youtube_id: altId,
+          id: 'yt_' + altId,
+          _retried: true,
+        };
+
+        set((state) => ({
+          currentTrack: updatedTrack,
+          queue: state.queue.map(t => (t.id === track.id ? updatedTrack : t)),
+          isPlaying: true,
+        }));
+
+        if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
+          globalYTPlayer.loadVideoById(altId);
+          globalYTPlayer.playVideo();
+        }
+      } else {
+        get().nextTrack();
+      }
+    } catch (err) {
+      console.warn('Retry alternate stream error:', err);
+      get().nextTrack();
+    }
+  },
+
   // Fallback to YouTube if direct audio stream fails
   fallbackToYouTube: async (track) => {
     try {
       const res = await axios.get('/api/search', {
-        params: { q: `${track.title} ${track.artist?.name || ''}` }
+        params: { q: `${track.title} ${track.artist?.name || ''} audio` }
       });
       if (res.data && res.data.tracks && res.data.tracks.length > 0) {
         const ytTrack = res.data.tracks.find(t => t.source === 'youtube') || res.data.tracks[0];
@@ -323,7 +372,7 @@ export const useAudioStore = create((set, get) => ({
       currentTime: 0,
       duration: track.duration || 0,
       bufferedTime: 0,
-      isRightPanelOpen: true, // Auto open right side now-playing panel on song start
+      isRightPanelOpen: true,
     });
 
     if (isYT && ytVideoId) {
@@ -351,7 +400,6 @@ export const useAudioStore = create((set, get) => ({
           get().fallbackToYouTube(track);
         });
       } else {
-        // If no direct audio url, search YouTube
         get().fallbackToYouTube(track);
       }
     }
@@ -444,13 +492,15 @@ export const useAudioStore = create((set, get) => ({
     lastSeekTime = Date.now();
     const safeTime = Math.max(0, Math.min(get().duration || 300, newTime));
 
-    set({ currentTime: safeTime });
+    set({ currentTime: safeTime, isPlaying: true });
 
     if (currentTrack?.source === 'youtube' && globalYTPlayer && typeof globalYTPlayer.seekTo === 'function') {
       globalYTPlayer.seekTo(safeTime, true);
+      globalYTPlayer.playVideo();
     } else if (globalAudio) {
       try {
         globalAudio.currentTime = safeTime;
+        globalAudio.play().catch(() => {});
       } catch (err) {
         console.warn('HTML5 seek error:', err);
       }

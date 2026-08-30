@@ -26,24 +26,18 @@ class MusicController extends Controller
     }
 
     /**
-     * Get featured homepage data (Live Audius Trending + V-Music Hits)
+     * Featured tracks & playlists for homepage
      */
     public function featured()
     {
-        // 1. Live Trending from Audius API (Full length 320kbps)
-        $audiusTrending = $this->liveMusic->getAudiusTrending(8);
-
-        // 2. Seeded & Live V-Music Tracks
+        // 1. Seeded & Live V-Music Tracks
         $localTracks = Track::with(['artist', 'album'])
             ->where('is_featured', true)
-            ->take(8)
+            ->take(12)
             ->get()
             ->toArray();
 
-        // Merge: Audius Trending + V-Pop Top Hits
-        $featuredTracks = array_merge($localTracks, $audiusTrending);
-
-        // Playlists
+        // 2. Playlists
         $featuredPlaylists = Playlist::with(['user', 'tracks'])
             ->withCount('tracks')
             ->where('is_featured', true)
@@ -51,32 +45,54 @@ class MusicController extends Controller
             ->take(6)
             ->get();
 
-        // Featured Artists
+        // 3. Featured Artists
         $featuredArtists = Artist::with('genre')
             ->where('is_verified', true)
             ->orderBy('monthly_listeners', 'desc')
-            ->take(6)
+            ->take(8)
             ->get();
 
-        // New Releases
+        // 4. New Releases
         $newReleases = Album::with('artist')
             ->orderBy('release_date', 'desc')
             ->take(6)
             ->get();
 
-        // Quick Picks
-        $quickPicks = !empty($audiusTrending) 
-            ? array_slice($audiusTrending, 0, 6) 
-            : array_slice($localTracks, 0, 6);
+        // 5. Quick Picks: 100% Vietnamese Hits
+        $quickPicks = array_slice($localTracks, 0, 8);
 
         return response()->json([
-            'featured_tracks' => $featuredTracks,
+            'featured_tracks' => $localTracks,
             'featured_playlists' => $featuredPlaylists,
             'featured_artists' => $featuredArtists,
             'new_releases' => $newReleases,
             'quick_picks' => $quickPicks,
-            'audius_trending' => $audiusTrending,
         ]);
+    }
+
+    /**
+     * Resolve Alternate Embeddable Stream (When Error 150/101 occurs)
+     */
+    public function resolveStream(Request $request)
+    {
+        $title = $request->get('title', '');
+        $artist = $request->get('artist', '');
+        $excludeId = $request->get('exclude_id', '');
+
+        $altTrack = $this->liveMusic->resolveAlternateStream($title, $artist, $excludeId);
+
+        if ($altTrack) {
+            return response()->json([
+                'success' => true,
+                'track' => $altTrack,
+                'youtube_id' => $altTrack['youtube_id'] ?? null,
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'No alternate stream found',
+        ], 404);
     }
 
     /**
