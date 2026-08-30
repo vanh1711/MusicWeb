@@ -17,8 +17,14 @@ class VietnameseMusicSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::first();
-        $user = User::skip(1)->first() ?: $admin;
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@vanhsound.com'],
+            ['name' => 'VanhSound Admin', 'password' => bcrypt('password'), 'role' => 'admin']
+        );
+        $user = User::firstOrCreate(
+            ['email' => 'user@vanhsound.com'],
+            ['name' => 'Vanh Sound Listener', 'password' => bcrypt('password'), 'role' => 'user']
+        );
 
         // Generate realistic 75-bar waveform data
         $generateWaveform = function ($seed = 1) {
