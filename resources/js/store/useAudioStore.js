@@ -285,13 +285,16 @@ export const useAudioStore = create((set, get) => ({
       });
     }
 
-    // Fetch initial favorites
-    axios.get('/api/favorites').then(res => {
-      if (res.data && res.data.tracks) {
-        const ids = new Set(res.data.tracks.map(t => t.id));
-        set({ likedTrackIds: ids });
-      }
-    }).catch(() => {});
+    // Fetch initial favorites once
+    if (!isFavoritesFetched) {
+      isFavoritesFetched = true;
+      axios.get('/api/favorites').then(res => {
+        if (res.data && res.data.tracks) {
+          const ids = new Set(res.data.tracks.map(t => t.id));
+          set({ likedTrackIds: ids });
+        }
+      }).catch(() => {});
+    }
   },
 
   // Auto-retry with embeddable Topic/Audio version when Error 150/101 happens
@@ -460,8 +463,10 @@ export const useAudioStore = create((set, get) => ({
       if (globalAudio) globalAudio.pause();
       if (globalSCWidget && typeof globalSCWidget.pause === 'function') globalSCWidget.pause();
 
+      let ytRetryCount = 0;
       const playYTVideo = () => {
         if (globalYTPlayer && typeof globalYTPlayer.loadVideoById === 'function') {
+          ytRetryCount = 0;
           try {
             globalYTPlayer.loadVideoById(ytVideoId);
             globalYTPlayer.unMute();
@@ -470,9 +475,10 @@ export const useAudioStore = create((set, get) => ({
           } catch (e) {
             console.warn('playYTVideo error:', e);
           }
-        } else {
-          get().initAudio();
-          setTimeout(playYTVideo, 250);
+        } else if (ytRetryCount < 8) {
+          ytRetryCount++;
+          initYT();
+          setTimeout(playYTVideo, 300);
         }
       };
       playYTVideo();
