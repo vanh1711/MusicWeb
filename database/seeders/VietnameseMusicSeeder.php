@@ -237,8 +237,8 @@ class VietnameseMusicSeeder extends Seeder
                         ],
                         [
                             'album_id' => $album->id,
-                            'duration' => isset($r['trackTimeMillis']) ? (int)round($r['trackTimeMillis'] / 1000) : 240,
-                            'audio_url' => null,
+                            'duration' => 30,
+                            'audio_url' => $previewAudio,
                             'cover_url' => $coverUrl,
                             'lyrics_lrc' => $lyrics,
                             'waveform_data' => $generateWaveform($aIndex * 10 + $tIndex),

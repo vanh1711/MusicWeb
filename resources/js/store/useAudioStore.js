@@ -412,16 +412,8 @@ export const useAudioStore = create((set, get) => ({
     const isSC = track.source === 'soundcloud' || String(track.id).startsWith('sc_') || (track.audio_url && track.audio_url.includes('soundcloud.com'));
     const ytVideoId = track.youtube_id || (isYT ? String(track.id).replace('yt_', '') : null);
 
-    const isPreviewUrl = track.audio_url && (
-      track.audio_url.includes('itunes.apple.com') ||
-      track.audio_url.includes('mzstatic.com') ||
-      track.audio_url.includes('audio-ssl') ||
-      track.audio_url.includes('/preview/') ||
-      track.audio_url.includes('-preview')
-    );
-
-    // If track is a 30s preview clip or missing direct stream URL, auto-resolve 100% full-length stream!
-    if (isPreviewUrl || (!track.audio_url && !ytVideoId && !isSC)) {
+    // If track has no audio URL, no video ID and not SoundCloud, fallback to YouTube
+    if (!track.audio_url && !ytVideoId && !isSC) {
       get().fallbackToYouTube(track);
       return;
     }
@@ -432,7 +424,7 @@ export const useAudioStore = create((set, get) => ({
       queueIndex,
       isPlaying: true,
       currentTime: 0,
-      duration: track.duration || 0,
+      duration: track.duration || 30,
       bufferedTime: 0,
       isRightPanelOpen: true,
     });
