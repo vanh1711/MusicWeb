@@ -6,6 +6,7 @@ let globalYTPlayer = null;
 let globalSCWidget = null;
 let ytPollInterval = null;
 let lastSeekTime = 0;
+let isFavoritesFetched = false;
 
 if (typeof window !== 'undefined') {
   globalAudio = new Audio();
